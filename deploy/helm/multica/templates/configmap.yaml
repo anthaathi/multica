@@ -19,6 +19,11 @@ data:
   DISABLE_WORKSPACE_CREATION: {{ .Values.backend.config.disableWorkspaceCreation | quote }}
   GOOGLE_CLIENT_ID: {{ .Values.backend.config.googleClientId | quote }}
   GOOGLE_REDIRECT_URI: {{ .Values.backend.config.googleRedirectUri | quote }}
+  MULTICA_PUBLIC_URL: {{ .Values.backend.config.publicUrl | quote }}
+  # GitLab integration (non-secret half). GITLAB_OAUTH_CLIENT_SECRET and
+  # MULTICA_GITLAB_SECRET_KEY come from the existingSecret via envFrom.
+  GITLAB_URL: {{ .Values.backend.config.gitlabUrl | quote }}
+  GITLAB_OAUTH_CLIENT_ID: {{ .Values.backend.config.gitlabOauthClientId | quote }}
   S3_BUCKET: {{ .Values.backend.config.s3Bucket | quote }}
   S3_REGION: {{ .Values.backend.config.s3Region | quote }}
   CLOUDFRONT_DOMAIN: {{ .Values.backend.config.cloudfrontDomain | quote }}

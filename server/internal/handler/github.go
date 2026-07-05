@@ -55,6 +55,9 @@ type GitHubInstallationResponse struct {
 }
 
 type GitHubPullRequestResponse struct {
+	// Provider distinguishes GitHub PRs from GitLab MRs in the merged
+	// issue-detail list. Defaults to "github"; GitLab rows set "gitlab".
+	Provider        string  `json:"provider,omitempty"`
 	ID              string  `json:"id"`
 	WorkspaceID     string  `json:"workspace_id"`
 	RepoOwner       string  `json:"repo_owner"`
@@ -126,6 +129,7 @@ func githubInstallationToBroadcast(i db.GithubInstallation) GitHubInstallationRe
 
 func githubPullRequestToResponse(p db.GithubPullRequest) GitHubPullRequestResponse {
 	return GitHubPullRequestResponse{
+		Provider:        "github",
 		ID:              uuidToString(p.ID),
 		WorkspaceID:     uuidToString(p.WorkspaceID),
 		RepoOwner:       p.RepoOwner,
@@ -154,6 +158,7 @@ func githubPullRequestToResponse(p db.GithubPullRequest) GitHubPullRequestRespon
 
 func issuePullRequestRowToResponse(p db.ListPullRequestsByIssueRow) GitHubPullRequestResponse {
 	return GitHubPullRequestResponse{
+		Provider:         "github",
 		ID:               uuidToString(p.ID),
 		WorkspaceID:      uuidToString(p.WorkspaceID),
 		RepoOwner:        p.RepoOwner,
@@ -570,6 +575,16 @@ func (h *Handler) ListPullRequestsForIssue(w http.ResponseWriter, r *http.Reques
 	out := make([]GitHubPullRequestResponse, 0, len(rows))
 	for _, row := range rows {
 		out = append(out, issuePullRequestRowToResponse(row))
+	}
+	// Merge GitLab merge requests into the same list so the issue-detail
+	// sidebar renders both providers from one array (each tagged provider).
+	mrRows, err := h.Queries.ListMergeRequestsByIssue(r.Context(), issue.ID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list merge requests")
+		return
+	}
+	for _, row := range mrRows {
+		out = append(out, gitlabMRRowToResponse(row))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"pull_requests": out})
 }

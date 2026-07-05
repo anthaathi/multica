@@ -28,7 +28,14 @@ export interface GitHubInstallation {
   connected_by?: string;
 }
 
+/** Which forge a linked change lives on. Absent on older backends; treat
+ * absence as "github" (the only provider before GitLab support). */
+export type PullRequestProvider = "github" | "gitlab";
+
 export interface GitHubPullRequest {
+  /** Forge this row came from. GitLab merge requests are mapped onto this same
+   * shape so the issue-detail list can render both from one array. */
+  provider?: PullRequestProvider;
   id: string;
   workspace_id: string;
   repo_owner: string;

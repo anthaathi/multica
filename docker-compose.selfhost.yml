@@ -87,6 +87,16 @@ services:
       DISABLE_WORKSPACE_CREATION: ${DISABLE_WORKSPACE_CREATION:-}
       GITHUB_APP_SLUG: ${GITHUB_APP_SLUG:-}
       GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET:-}
+      # GitLab (self-hosted) integration. All four are the opt-in: unset =
+      # integration disabled. GITLAB_URL is the instance base URL; the OAuth
+      # client id/secret come from an OAuth application registered on that
+      # instance; MULTICA_GITLAB_SECRET_KEY (base64-encoded 32-byte key)
+      # encrypts the per-connection OAuth tokens + webhook secrets at rest.
+      # The OAuth callback + webhook URLs are derived from MULTICA_PUBLIC_URL.
+      GITLAB_URL: ${GITLAB_URL:-}
+      GITLAB_OAUTH_CLIENT_ID: ${GITLAB_OAUTH_CLIENT_ID:-}
+      GITLAB_OAUTH_CLIENT_SECRET: ${GITLAB_OAUTH_CLIENT_SECRET:-}
+      MULTICA_GITLAB_SECRET_KEY: ${MULTICA_GITLAB_SECRET_KEY:-}
       # Public URL the API is reachable at from the open internet, no
       # trailing slash. Used to mint absolute webhook URLs for autopilot
       # webhook triggers. Leave unset behind a same-origin reverse proxy

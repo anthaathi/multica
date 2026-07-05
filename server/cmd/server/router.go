@@ -511,6 +511,21 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 		slog.Info("slack integration disabled (MULTICA_SLACK_SECRET_KEY not set)")
 	}
 
+	// GitLab integration: at-rest encryption of OAuth tokens + per-connection
+	// webhook secrets. Nil box → the GitLab HTTP handlers report "not
+	// configured" (no plaintext token storage), mirroring Slack/Lark.
+	if gitlabKey, err := secretbox.LoadKey("MULTICA_GITLAB_SECRET_KEY"); err == nil {
+		box, err := secretbox.New(gitlabKey)
+		if err != nil {
+			slog.Error("gitlab: secretbox.New failed; gitlab integration disabled", "error", err)
+		} else {
+			h.GitLabBox = box
+			slog.Info("gitlab integration enabled (OAuth connect + webhook mirror)")
+		}
+	} else {
+		slog.Info("gitlab integration disabled (MULTICA_GITLAB_SECRET_KEY not set)")
+	}
+
 	// Composio integration (MUL-3720). Gated by COMPOSIO_API_KEY plus the
 	// composio_mcp_apps feature flag. The env var is the project-scoped key the
 	// standalone SDK authenticates Composio with (sent as x-api-key; the project
@@ -697,6 +712,12 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 	// HMAC-SHA256 signature in the handler) and post-install setup callback.
 	r.Post("/api/webhooks/github", h.HandleGitHubWebhook)
 	r.Get("/api/github/setup", h.GitHubSetupCallback)
+	// GitLab webhook (no Multica auth — deliveries carry a per-connection
+	// secret in X-Gitlab-Token, verified in the handler) and OAuth callback
+	// (hit by GitLab's browser redirect; the workspace is recovered from the
+	// signed state).
+	r.Post("/api/webhooks/gitlab", h.HandleGitLabWebhook)
+	r.Get("/api/gitlab/oauth/callback", h.GitLabOAuthCallback)
 	// Slack OAuth callback (no Multica auth in the path — it is hit by Slack's
 	// browser redirect; the workspace/agent/initiator are recovered from the
 	// sealed state). It exchanges the code, upserts the install, then bounces
@@ -809,6 +830,10 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					// the handler strips the management handle and adds a
 					// can_manage hint so the UI can gate connect/disconnect.
 					r.Get("/github/installations", h.ListGitHubInstallations)
+					// Listing GitLab connections is member-visible for the same
+					// reason as GitHub; the handler strips the webhook secret and
+					// adds a can_manage hint.
+					r.Get("/gitlab/connections", h.ListGitLabConnections)
 					// Custom runtime profiles — listing/reading is member-visible
 					// (the Runtime page renders for everyone; create/edit/delete
 					// are admin-gated below).
@@ -842,6 +867,10 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					r.Use(middleware.RequireWorkspaceRoleFromURL(queries, "id", "owner", "admin"))
 					r.Get("/github/connect", h.GitHubConnect)
 					r.Delete("/github/installations/{installationId}", h.DeleteGitHubInstallation)
+					// GitLab integration — connect / disconnect admin-only,
+					// mirroring GitHub.
+					r.Get("/gitlab/connect", h.GitLabConnect)
+					r.Delete("/gitlab/connections/{connectionId}", h.DeleteGitLabConnection)
 				})
 
 				// Lark integration. Listing is member-visible (same

@@ -114,7 +114,13 @@ export type {
   GitHubPullRequestState,
   ListGitHubInstallationsResponse,
   GitHubConnectResponse,
+  PullRequestProvider,
 } from "./github";
+export type {
+  GitLabConnection,
+  ListGitLabConnectionsResponse,
+  GitLabConnectResponse,
+} from "./gitlab";
 export type {
   LarkInstallation,
   ListLarkInstallationsResponse,

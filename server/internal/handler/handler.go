@@ -31,6 +31,7 @@ import (
 	"github.com/multica-ai/multica/server/internal/service"
 	"github.com/multica-ai/multica/server/internal/storage"
 	"github.com/multica-ai/multica/server/internal/util"
+	"github.com/multica-ai/multica/server/internal/util/secretbox"
 	db "github.com/multica-ai/multica/server/pkg/db/generated"
 	"github.com/multica-ai/multica/server/pkg/featureflag"
 )
@@ -197,7 +198,13 @@ type Handler struct {
 	// unless Slack is configured; GetChatChannelHistory then reports "no channel
 	// integration". A future platform satisfies the same reader interface.
 	SlackHistory ChatChannelHistoryReader
-	cfg          Config
+	// GitLabBox encrypts/decrypts the OAuth tokens and per-connection webhook
+	// secrets stored in gitlab_connection. Nil unless MULTICA_GITLAB_SECRET_KEY
+	// is set; the GitLab HTTP handlers then report "not configured" (no
+	// plaintext token storage, mirroring Slack/Lark). Wired in
+	// cmd/server/router.go after handler.New.
+	GitLabBox *secretbox.Box
+	cfg       Config
 }
 
 func New(queries *db.Queries, txStarter txStarter, hub *realtime.Hub, bus *events.Bus, emailService *service.EmailService, store storage.Storage, cfSigner *auth.CloudFrontSigner, analyticsClient analytics.Client, cfg Config, daemonHubs ...*daemonws.Hub) *Handler {

@@ -109,6 +109,8 @@ import type {
   GitHubPullRequest,
   ListGitHubInstallationsResponse,
   GitHubConnectResponse,
+  ListGitLabConnectionsResponse,
+  GitLabConnectResponse,
   ListLarkInstallationsResponse,
   BeginLarkInstallResponse,
   LarkInstallStatusResponse,
@@ -2260,6 +2262,21 @@ export class ApiClient {
 
   async listIssuePullRequests(issueId: string): Promise<{ pull_requests: GitHubPullRequest[] }> {
     return this.fetch(`/api/issues/${issueId}/pull-requests`);
+  }
+
+  // GitLab integration
+  async getGitLabConnectURL(workspaceId: string): Promise<GitLabConnectResponse> {
+    return this.fetch(`/api/workspaces/${workspaceId}/gitlab/connect`);
+  }
+
+  async listGitLabConnections(workspaceId: string): Promise<ListGitLabConnectionsResponse> {
+    return this.fetch(`/api/workspaces/${workspaceId}/gitlab/connections`);
+  }
+
+  async deleteGitLabConnection(workspaceId: string, connectionId: string): Promise<void> {
+    await this.fetch(`/api/workspaces/${workspaceId}/gitlab/connections/${connectionId}`, {
+      method: "DELETE",
+    });
   }
 
   // Lark integration

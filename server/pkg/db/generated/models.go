@@ -464,6 +464,69 @@ type GithubPullRequestCheckSuite struct {
 	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
 }
 
+type GitlabConnection struct {
+	ID                     pgtype.UUID        `json:"id"`
+	WorkspaceID            pgtype.UUID        `json:"workspace_id"`
+	GitlabBaseUrl          string             `json:"gitlab_base_url"`
+	GitlabUserID           int64              `json:"gitlab_user_id"`
+	GitlabUsername         string             `json:"gitlab_username"`
+	GitlabAvatarUrl        pgtype.Text        `json:"gitlab_avatar_url"`
+	AccessTokenEncrypted   []byte             `json:"access_token_encrypted"`
+	RefreshTokenEncrypted  []byte             `json:"refresh_token_encrypted"`
+	TokenExpiresAt         pgtype.Timestamptz `json:"token_expires_at"`
+	WebhookSecretEncrypted []byte             `json:"webhook_secret_encrypted"`
+	ConnectedByID          pgtype.UUID        `json:"connected_by_id"`
+	CreatedAt              pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt              pgtype.Timestamptz `json:"updated_at"`
+}
+
+type GitlabMergeRequest struct {
+	ID              pgtype.UUID        `json:"id"`
+	WorkspaceID     pgtype.UUID        `json:"workspace_id"`
+	ConnectionID    pgtype.UUID        `json:"connection_id"`
+	ProjectID       int64              `json:"project_id"`
+	NamespacePath   string             `json:"namespace_path"`
+	ProjectPath     string             `json:"project_path"`
+	MrIid           int32              `json:"mr_iid"`
+	Title           string             `json:"title"`
+	State           string             `json:"state"`
+	WebUrl          string             `json:"web_url"`
+	SourceBranch    pgtype.Text        `json:"source_branch"`
+	AuthorUsername  pgtype.Text        `json:"author_username"`
+	AuthorAvatarUrl pgtype.Text        `json:"author_avatar_url"`
+	MergedAt        pgtype.Timestamptz `json:"merged_at"`
+	ClosedAt        pgtype.Timestamptz `json:"closed_at"`
+	MrCreatedAt     pgtype.Timestamptz `json:"mr_created_at"`
+	MrUpdatedAt     pgtype.Timestamptz `json:"mr_updated_at"`
+	HeadSha         string             `json:"head_sha"`
+	MergeStatus     pgtype.Text        `json:"merge_status"`
+	Additions       int32              `json:"additions"`
+	Deletions       int32              `json:"deletions"`
+	ChangedFiles    int32              `json:"changed_files"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+}
+
+type GitlabMergeRequestPipeline struct {
+	MrID       pgtype.UUID        `json:"mr_id"`
+	PipelineID int64              `json:"pipeline_id"`
+	HeadSha    string             `json:"head_sha"`
+	Status     string             `json:"status"`
+	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
+}
+
+type GitlabPendingPipeline struct {
+	WorkspaceID       pgtype.UUID        `json:"workspace_id"`
+	ConnectionID      pgtype.UUID        `json:"connection_id"`
+	ProjectID         int64              `json:"project_id"`
+	MrIid             int32              `json:"mr_iid"`
+	PipelineID        int64              `json:"pipeline_id"`
+	HeadSha           string             `json:"head_sha"`
+	Status            string             `json:"status"`
+	PipelineUpdatedAt pgtype.Timestamptz `json:"pipeline_updated_at"`
+	ReceivedAt        pgtype.Timestamptz `json:"received_at"`
+}
+
 type InboxItem struct {
 	ID            pgtype.UUID        `json:"id"`
 	WorkspaceID   pgtype.UUID        `json:"workspace_id"`
@@ -524,6 +587,16 @@ type IssueLabel struct {
 	Color       string             `json:"color"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+type IssueMergeRequest struct {
+	IssueID        pgtype.UUID        `json:"issue_id"`
+	MergeRequestID pgtype.UUID        `json:"merge_request_id"`
+	LinkedByType   pgtype.Text        `json:"linked_by_type"`
+	LinkedByID     pgtype.UUID        `json:"linked_by_id"`
+	CloseIntent    bool               `json:"close_intent"`
+	ReferenceOnly  bool               `json:"reference_only"`
+	LinkedAt       pgtype.Timestamptz `json:"linked_at"`
 }
 
 type IssuePullRequest struct {
