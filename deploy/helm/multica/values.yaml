@@ -138,6 +138,13 @@ backend:
     # plus publicUrl above, must be present for the Connect flow to work.
     gitlabUrl: ""
     gitlabOauthClientId: ""
+    # Optional: base URL the backend uses for server-to-server GitLab calls
+    # (OAuth token exchange, /api/v4/*, webhook registration). Set this to an
+    # in-cluster Service address when the public gitlabUrl is not resolvable
+    # from inside the cluster (e.g. split-horizon / VPN-only DNS). gitlabUrl
+    # stays the browser-facing identity (authorize URL + stored host). Empty
+    # falls back to gitlabUrl.
+    gitlabInternalUrl: ""
     s3Bucket: ""
     s3Region: us-west-2
     cloudfrontDomain: ""

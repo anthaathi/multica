@@ -35,6 +35,21 @@ func gitlabInstanceURL() string {
 	return strings.TrimRight(strings.TrimSpace(os.Getenv("GITLAB_URL")), "/")
 }
 
+// gitlabInternalURL is the base URL used for server-to-server calls against the
+// GitLab instance (OAuth token exchange at /oauth/token, /api/v4/* reads, and
+// project webhook registration). When GITLAB_INTERNAL_URL is set, it overrides
+// GITLAB_URL for these calls only — useful when the public GITLAB_URL is not
+// resolvable from inside the cluster (e.g. it only exists in split-horizon /
+// VPN DNS), so the backend dials an in-cluster Service address instead.
+// GITLAB_URL remains the browser-facing identity (OAuth authorize URL, stored
+// connection host used for repo host-matching). Falls back to GITLAB_URL.
+func gitlabInternalURL() string {
+	if v := strings.TrimRight(strings.TrimSpace(os.Getenv("GITLAB_INTERNAL_URL")), "/"); v != "" {
+		return v
+	}
+	return gitlabInstanceURL()
+}
+
 func gitlabOAuthClientID() string { return strings.TrimSpace(os.Getenv("GITLAB_OAUTH_CLIENT_ID")) }
 
 func gitlabOAuthClientSecret() string {
@@ -381,7 +396,7 @@ func (h *Handler) exchangeGitLabCode(ctx context.Context, code string) (gitlabTo
 		"grant_type":    {"authorization_code"},
 		"redirect_uri":  {gitlabOAuthRedirectURI()},
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, gitlabInstanceURL()+"/oauth/token", strings.NewReader(form.Encode()))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, gitlabInternalURL()+"/oauth/token", strings.NewReader(form.Encode()))
 	if err != nil {
 		return gitlabTokenResponse{}, err
 	}
@@ -407,7 +422,7 @@ func (h *Handler) exchangeGitLabCode(ctx context.Context, code string) (gitlabTo
 }
 
 func (h *Handler) fetchGitLabUser(ctx context.Context, accessToken string) (gitlabUser, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, gitlabInstanceURL()+"/api/v4/user", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, gitlabInternalURL()+"/api/v4/user", nil)
 	if err != nil {
 		return gitlabUser{}, err
 	}
@@ -551,7 +566,7 @@ func (h *Handler) registerGitLabWebhooks(ctx context.Context, conn db.GitlabConn
 			continue
 		}
 		projectPath := strings.TrimPrefix(identity, strings.ToLower(host)+"/")
-		if err := h.createGitLabProjectHook(ctx, conn.GitlabBaseUrl, accessToken, projectPath, whURL, webhookSecret); err != nil {
+	if err := h.createGitLabProjectHook(ctx, gitlabInternalURL(), accessToken, projectPath, whURL, webhookSecret); err != nil {
 			slog.Warn("gitlab: register project webhook failed", "err", err, "project", projectPath)
 		}
 	}

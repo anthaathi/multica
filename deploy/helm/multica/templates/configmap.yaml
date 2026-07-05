@@ -23,6 +23,10 @@ data:
   # GitLab integration (non-secret half). GITLAB_OAUTH_CLIENT_SECRET and
   # MULTICA_GITLAB_SECRET_KEY come from the existingSecret via envFrom.
   GITLAB_URL: {{ .Values.backend.config.gitlabUrl | quote }}
+  # Optional: overrides GITLAB_URL for server-to-server calls only (OAuth token
+  # exchange, /api/v4/* reads, webhook registration). Set when the public
+  # GITLAB_URL is not resolvable from inside the cluster (split-horizon DNS).
+  GITLAB_INTERNAL_URL: {{ .Values.backend.config.gitlabInternalUrl | quote }}
   GITLAB_OAUTH_CLIENT_ID: {{ .Values.backend.config.gitlabOauthClientId | quote }}
   S3_BUCKET: {{ .Values.backend.config.s3Bucket | quote }}
   S3_REGION: {{ .Values.backend.config.s3Region | quote }}
