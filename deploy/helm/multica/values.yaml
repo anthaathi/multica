@@ -30,7 +30,8 @@ images:
 #     --from-literal=CLOUDFRONT_PRIVATE_KEY="" \
 #     --from-literal=MULTICA_DEV_VERIFICATION_CODE="" \
 #     --from-literal=GITLAB_OAUTH_CLIENT_SECRET="" \
-#     --from-literal=MULTICA_GITLAB_SECRET_KEY=""
+#     --from-literal=MULTICA_GITLAB_SECRET_KEY="" \
+#     --from-literal=MULTICA_SLACK_SECRET_KEY="$(openssl rand -base64 32)"
 #
 # External postgres (postgres.external.enabled=true):
 #   Replace POSTGRES_PASSWORD with DATABASE_URL pointing at your external cluster.
@@ -42,7 +43,8 @@ images:
 #     --from-literal=CLOUDFRONT_PRIVATE_KEY="" \
 #     --from-literal=MULTICA_DEV_VERIFICATION_CODE="" \
 #     --from-literal=GITLAB_OAUTH_CLIENT_SECRET="" \
-#     --from-literal=MULTICA_GITLAB_SECRET_KEY=""
+#     --from-literal=MULTICA_GITLAB_SECRET_KEY="" \
+#     --from-literal=MULTICA_SLACK_SECRET_KEY="$(openssl rand -base64 32)"
 #
 # The chart references this Secret by name; it does not template it, so real
 # values never need to land in git.
