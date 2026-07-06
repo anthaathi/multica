@@ -135,6 +135,15 @@ import type {
   BillingCheckoutSessionStatus,
   CreateBillingPortalSessionResponse,
 } from "../types";
+import type {
+  IssueSyncSource,
+  ListSyncSourcesResponse,
+  ListRemoteContainersResponse,
+  ListJiraConnectionsResponse,
+  JiraConnectResponse,
+  CreateSyncSourceInput,
+  UpdateSyncSourceInput,
+} from "../types/issue-sync";
 import type { OnboardingCompletionPath } from "../onboarding/types";
 import type { CreateFeedbackResponse, FeedbackKind } from "../feedback/types";
 import type {
@@ -222,6 +231,16 @@ import {
   InboxUnreadSummarySchema,
   EMPTY_INBOX_UNREAD_SUMMARY,
 } from "./schemas";
+import {
+  ListSyncSourcesResponseSchema,
+  EMPTY_LIST_SYNC_SOURCES_RESPONSE,
+  ListRemoteContainersResponseSchema,
+  EMPTY_LIST_REMOTE_CONTAINERS_RESPONSE,
+  ListJiraConnectionsResponseSchema,
+  EMPTY_LIST_JIRA_CONNECTIONS_RESPONSE,
+  JiraConnectResponseSchema,
+  EMPTY_JIRA_CONNECT_RESPONSE,
+} from "../types/issue-sync";
 
 /** Identifies the calling client to the server.
  *  Sent on every HTTP request as X-Client-Platform / X-Client-Version /
@@ -2383,5 +2402,106 @@ export class ApiClient {
       method: "POST",
       body: JSON.stringify({ token }),
     });
+  }
+  // ── Issue sync ──────────────────────────────────────────────────────────
+  // Sync-source CRUD + remote container listing for the project attach flow.
+  // Responses are parsed through lenient zod schemas so a drifted backend
+  // contract degrades to empty data instead of a white-screen (see
+  // CLAUDE.md "API Compatibility").
+
+  async listSyncSources(projectId: string): Promise<ListSyncSourcesResponse> {
+    const raw = await this.fetch<unknown>(
+      `/api/projects/${projectId}/sync-sources`,
+    );
+    return parseWithFallback(
+      raw,
+      ListSyncSourcesResponseSchema,
+      EMPTY_LIST_SYNC_SOURCES_RESPONSE,
+      { endpoint: "GET /api/projects/:id/sync-sources" },
+    );
+  }
+
+  async createSyncSource(
+    projectId: string,
+    data: CreateSyncSourceInput,
+  ): Promise<IssueSyncSource> {
+    return this.fetch(`/api/projects/${projectId}/sync-sources`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateSyncSource(
+    projectId: string,
+    sourceId: string,
+    data: UpdateSyncSourceInput,
+  ): Promise<IssueSyncSource> {
+    return this.fetch(`/api/projects/${projectId}/sync-sources/${sourceId}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteSyncSource(projectId: string, sourceId: string): Promise<void> {
+    await this.fetch(`/api/projects/${projectId}/sync-sources/${sourceId}`, {
+      method: "DELETE",
+    });
+  }
+
+  async listRemoteContainers(
+    workspaceId: string,
+    provider: string,
+    connectionId?: string,
+  ): Promise<ListRemoteContainersResponse> {
+    const search = new URLSearchParams();
+    if (connectionId) search.set("connection_id", connectionId);
+    const qs = search.toString();
+    const raw = await this.fetch<unknown>(
+      `/api/workspaces/${workspaceId}/sync/${provider}/remote-projects${qs ? `?${qs}` : ""}`,
+    );
+    return parseWithFallback(
+      raw,
+      ListRemoteContainersResponseSchema,
+      EMPTY_LIST_REMOTE_CONTAINERS_RESPONSE,
+      { endpoint: "GET /api/workspaces/:id/sync/:provider/remote-projects" },
+    );
+  }
+
+  // ── Jira integration ────────────────────────────────────────────────────
+
+  async getJiraConnectURL(workspaceId: string): Promise<JiraConnectResponse> {
+    const raw = await this.fetch<unknown>(
+      `/api/workspaces/${workspaceId}/jira/connect`,
+    );
+    return parseWithFallback(
+      raw,
+      JiraConnectResponseSchema,
+      EMPTY_JIRA_CONNECT_RESPONSE,
+      { endpoint: "GET /api/workspaces/:id/jira/connect" },
+    );
+  }
+
+  async listJiraConnections(
+    workspaceId: string,
+  ): Promise<ListJiraConnectionsResponse> {
+    const raw = await this.fetch<unknown>(
+      `/api/workspaces/${workspaceId}/jira/connections`,
+    );
+    return parseWithFallback(
+      raw,
+      ListJiraConnectionsResponseSchema,
+      EMPTY_LIST_JIRA_CONNECTIONS_RESPONSE,
+      { endpoint: "GET /api/workspaces/:id/jira/connections" },
+    );
+  }
+
+  async deleteJiraConnection(
+    workspaceId: string,
+    connectionId: string,
+  ): Promise<void> {
+    await this.fetch(
+      `/api/workspaces/${workspaceId}/jira/connections/${connectionId}`,
+      { method: "DELETE" },
+    );
   }
 }

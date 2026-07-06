@@ -477,5 +477,9 @@
     "row_backlog_hint": "에이전트를 대기 상태로 유지",
     "row_todo_label": "할 일",
     "row_todo_hint": "에이전트 시작"
+  },
+  "sync_badges": {
+    "label": "동기화됨",
+    "open": "열기"
   }
 }

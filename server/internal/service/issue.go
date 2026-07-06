@@ -91,6 +91,13 @@ type IssueCreateOpts struct {
 	// owner). Empty falls back to CreatorID.
 	ActorID string
 
+	// ActorType overrides the actor type used for the EventIssueCreated
+	// broadcast when it differs from the creator on the row. The issue-sync
+	// engine passes "issue_sync" so its outbound listeners can distinguish
+	// sync-driven creates from user creates (the row's creator_type stays
+	// "member" — the attaching user). Empty falls back to CreatorType.
+	ActorType string
+
 	// AnalyticsAgentID is the agent associated with the issue for
 	// analytics purposes (assignee agent or, for agent-created issues,
 	// the creator agent). Resolved by the caller because it depends on
@@ -278,8 +285,12 @@ func (s *IssueService) Create(ctx context.Context, p IssueCreateParams, opts Iss
 	if actorID == "" {
 		actorID = util.UUIDToString(issue.CreatorID)
 	}
+	actorType := opts.ActorType
+	if actorType == "" {
+		actorType = p.CreatorType
+	}
 
-	s.publishIssueCreated(issue, attachments, p.CreatorType, actorID, opts)
+	s.publishIssueCreated(issue, attachments, actorType, actorID, opts)
 	s.captureCreatedAnalytics(issue, p.CreatorType, actorID, opts)
 	s.maybeEnqueueOnAssign(ctx, issue, p.CreatorType, actorID)
 
@@ -376,6 +387,8 @@ func classifyOrigin(issue db.Issue, opts IssueCreateOpts) (source, taskID, autop
 		return analytics.SourceManual, originID, ""
 	case "autopilot":
 		return analytics.SourceAutopilot, "", originID
+	case "issue_sync":
+		return analytics.SourceIssueSync, "", ""
 	default:
 		slog.Warn("analytics: unknown issue origin type",
 			"origin_type", issue.OriginType.String,

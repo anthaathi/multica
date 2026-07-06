@@ -28,6 +28,7 @@ import (
 	"github.com/multica-ai/multica/server/internal/integrations/channel"
 	"github.com/multica-ai/multica/server/internal/integrations/channel/engine"
 	composiointeg "github.com/multica-ai/multica/server/internal/integrations/composio"
+	"github.com/multica-ai/multica/server/internal/integrations/issuesync"
 	"github.com/multica-ai/multica/server/internal/integrations/lark"
 	"github.com/multica-ai/multica/server/internal/integrations/slack"
 	obsmetrics "github.com/multica-ai/multica/server/internal/metrics"
@@ -526,6 +527,50 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 		slog.Info("gitlab integration disabled (MULTICA_GITLAB_SECRET_KEY not set)")
 	}
 
+	// Jira integration: at-rest encryption of OAuth tokens + per-connection
+	// webhook secrets, mirroring GitLab. Nil box → the Jira HTTP handlers
+	// report "not configured".
+	if jiraKey, err := secretbox.LoadKey("MULTICA_JIRA_SECRET_KEY"); err == nil {
+		box, err := secretbox.New(jiraKey)
+		if err != nil {
+			slog.Error("jira: secretbox.New failed; jira integration disabled", "error", err)
+		} else {
+			h.JiraBox = box
+			slog.Info("jira integration enabled (OAuth 3LO + issue sync)")
+		}
+	} else {
+		slog.Info("jira integration disabled (MULTICA_JIRA_SECRET_KEY not set)")
+	}
+
+	// Issue sync engine: bidirectional GitHub/GitLab/Jira Issues <-> Multica.
+	// The GitHub provider is always registered (it reuses the GitHub App
+	// credentials already wired for the PR-mirror flow); GitLab/Jira providers
+	// register when their connection flows are exercised (M2/M3 add them via
+	// h.IssueSync.Providers after constructing their provider). IssuePayload is
+	// injected so the activity listener — which type-asserts payload["issue"] to
+	// handler.IssueResponse — keeps working for sync-driven writes.
+	syncEngine := &issuesync.Engine{
+		Queries:      queries,
+		Bus:          bus,
+		IssueService: h.IssueService,
+		Providers: map[string]issuesync.Provider{
+			issuesync.ProviderGitHub: issuesync.NewGitHubProvider(queries),
+		},
+		IssuePayload: func(ctx context.Context, issue db.Issue) map[string]any {
+			return map[string]any{"issue": h.BuildIssueResponseForSync(ctx, issue)}
+		},
+	}
+	h.IssueSync = syncEngine
+	// GitLab provider registers only when its secretbox key is configured
+	// (same gate as the OAuth/webhook handlers); nil box → provider absent.
+	if h.GitLabBox != nil {
+		h.IssueSync.Providers[issuesync.ProviderGitLab] = issuesync.NewGitLabProvider(queries, h.GitLabBox)
+	}
+	// Jira provider registers only when its secretbox key + OAuth env are set.
+	if h.JiraBox != nil {
+		h.IssueSync.Providers[issuesync.ProviderJira] = issuesync.NewJiraProvider(queries, h.JiraBox)
+	}
+
 	// Composio integration (MUL-3720). Gated by COMPOSIO_API_KEY plus the
 	// composio_mcp_apps feature flag. The env var is the project-scoped key the
 	// standalone SDK authenticates Composio with (sent as x-api-key; the project
@@ -718,6 +763,12 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 	// signed state).
 	r.Post("/api/webhooks/gitlab", h.HandleGitLabWebhook)
 	r.Get("/api/gitlab/oauth/callback", h.GitLabOAuthCallback)
+	// Jira webhook (no Multica auth — the per-connection secret rides in the
+	// registered webhook URL's ?secret= query, verified in the handler) and
+	// OAuth callback (hit by Atlassian's browser redirect; the workspace is
+	// recovered from the signed state).
+	r.Post("/api/webhooks/jira/{connectionId}", h.HandleJiraWebhook)
+	r.Get("/api/jira/oauth/callback", h.JiraOAuthCallback)
 	// Slack OAuth callback (no Multica auth in the path — it is hit by Slack's
 	// browser redirect; the workspace/agent/initiator are recovered from the
 	// sealed state). It exchanges the code, upserts the install, then bounces
@@ -833,7 +884,11 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					// Listing GitLab connections is member-visible for the same
 					// reason as GitHub; the handler strips the webhook secret and
 					// adds a can_manage hint.
-					r.Get("/gitlab/connections", h.ListGitLabConnections)
+				r.Get("/gitlab/connections", h.ListGitLabConnections)
+				// Listing Jira connections is member-visible, mirroring GitLab.
+				r.Get("/jira/connections", h.ListJiraConnections)
+				// Remote repo/project picker for issue-sync source attach.
+				r.Get("/sync/{provider}/remote-projects", h.ListRemoteContainers)
 					// Custom runtime profiles — listing/reading is member-visible
 					// (the Runtime page renders for everyone; create/edit/delete
 					// are admin-gated below).
@@ -870,7 +925,10 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					// GitLab integration — connect / disconnect admin-only,
 					// mirroring GitHub.
 					r.Get("/gitlab/connect", h.GitLabConnect)
-					r.Delete("/gitlab/connections/{connectionId}", h.DeleteGitLabConnection)
+				r.Delete("/gitlab/connections/{connectionId}", h.DeleteGitLabConnection)
+				// Jira integration — connect / disconnect admin-only, mirroring GitLab.
+				r.Get("/jira/connect", h.JiraConnect)
+				r.Delete("/jira/connections/{connectionId}", h.DeleteJiraConnection)
 				})
 
 				// Lark integration. Listing is member-visible (same
@@ -1027,8 +1085,6 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					r.Delete("/reactions", h.RemoveIssueReaction)
 					r.Get("/attachments", h.ListAttachments)
 					r.Get("/children", h.ListChildIssues)
-					r.Get("/labels", h.ListLabelsForIssue)
-					r.Post("/labels", h.AttachLabel)
 					r.Delete("/labels/{labelId}", h.DetachLabel)
 					r.Get("/metadata", h.ListIssueMetadata)
 					r.Put("/metadata/{key}", h.SetIssueMetadataKey)
@@ -1063,7 +1119,12 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					r.Get("/resources", h.ListProjectResources)
 					r.Post("/resources", h.CreateProjectResource)
 					r.Put("/resources/{resourceId}", h.UpdateProjectResource)
-					r.Delete("/resources/{resourceId}", h.DeleteProjectResource)
+				r.Delete("/resources/{resourceId}", h.DeleteProjectResource)
+				// Issue sync sources — bidirectional GitHub/GitLab/Jira sync.
+				r.Get("/sync-sources", h.ListSyncSources)
+				r.Post("/sync-sources", h.CreateSyncSource)
+				r.Put("/sync-sources/{sourceId}", h.UpdateSyncSource)
+				r.Delete("/sync-sources/{sourceId}", h.DeleteSyncSource)
 				})
 			})
 

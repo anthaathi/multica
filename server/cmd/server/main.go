@@ -379,6 +379,12 @@ func main() {
 	taskSvc.Metrics = businessMetrics
 	autopilotSvc := service.NewAutopilotService(queries, pool, bus, taskSvc)
 	registerAutopilotListeners(bus, autopilotSvc)
+	// Issue sync outbound listeners mirror local issue/comment changes to
+	// attached external trackers. Must register after NewRouterWithOptions
+	// (which constructs the engine and assigns h.IssueSync) and before the
+	// server starts accepting traffic. Engine-driven writes carry ActorType
+	// "issue_sync" so these listeners never re-enqueue their own echoes.
+	registerIssueSyncListeners(bus, queries, h.IssueSync)
 
 	// Construct a LivenessStore that mirrors the one wired into the HTTP
 	// handler. Both the heartbeat write path (handler) and the sweeper read
@@ -394,6 +400,12 @@ func main() {
 	go heartbeatScheduler.Run(sweepCtx)
 	go runAutopilotFailureMonitor(autopilotCtx, queries, bus, envFailureMonitorConfig())
 	go runDBStatsLogger(sweepCtx, pool)
+	// Issue sync outbox: drains queued outbound pushes to external trackers.
+	// Multiple replicas can run it concurrently (claim uses FOR UPDATE SKIP
+	// LOCKED). Bound to sweepCtx so it winds down with the other workers.
+	if h.IssueSync != nil {
+		go h.IssueSync.RunOutbox(sweepCtx)
+	}
 
 	// Channel inbound supervisor (MUL-3620): holds the §4.4 WS lease per
 	// installation and drives each channel.Channel. It is built

@@ -651,6 +651,10 @@ func (h *Handler) HandleGitLabWebhook(w http.ResponseWriter, r *http.Request) {
 		h.handleMergeRequestEvent(r.Context(), conn, body)
 	case "pipeline":
 		h.handlePipelineEvent(r.Context(), conn, body)
+	case "issue":
+		h.handleGitLabIssueEvent(r.Context(), conn, body)
+	case "note":
+		h.handleGitLabNoteEvent(r.Context(), conn, body)
 	default:
 		// Acknowledge unmodeled events so GitLab doesn't mark the hook failing.
 	}

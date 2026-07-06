@@ -53,11 +53,18 @@ export interface ListProjectsResponse {
 //
 // Known types (UI must default-case unknown server-side additions):
 //   - github_repo: cloud-side git checkout, ref = { url, ref?, default_branch_hint? }
+//   - gitlab_repo: same shape as github_repo, pointed at a GitLab repo
 //   - local_directory: in-place agent execution on a specific daemon,
 //     ref = { local_path, daemon_id, label? }
-export type ProjectResourceType = "github_repo" | "local_directory";
+export type ProjectResourceType = "github_repo" | "gitlab_repo" | "local_directory";
 
 export interface GithubRepoResourceRef {
+  url: string;
+  ref?: string;
+  default_branch_hint?: string;
+}
+
+export interface GitlabRepoResourceRef {
   url: string;
   ref?: string;
   default_branch_hint?: string;
@@ -71,6 +78,7 @@ export interface LocalDirectoryResourceRef {
 
 export type ProjectResourceRef =
   | GithubRepoResourceRef
+  | GitlabRepoResourceRef
   | LocalDirectoryResourceRef
   | Record<string, unknown>;
 

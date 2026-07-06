@@ -383,6 +383,46 @@ type DaemonToken struct {
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 }
 
+type ExternalCommentLink struct {
+	ID                pgtype.UUID        `json:"id"`
+	IssueLinkID       pgtype.UUID        `json:"issue_link_id"`
+	CommentID         pgtype.UUID        `json:"comment_id"`
+	ExternalCommentID string             `json:"external_comment_id"`
+	Origin            string             `json:"origin"`
+	LastPushedHash    string             `json:"last_pushed_hash"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+}
+
+type ExternalIdentity struct {
+	ID                pgtype.UUID        `json:"id"`
+	WorkspaceID       pgtype.UUID        `json:"workspace_id"`
+	Provider          string             `json:"provider"`
+	ExternalAccountID string             `json:"external_account_id"`
+	ExternalLogin     pgtype.Text        `json:"external_login"`
+	DisplayName       pgtype.Text        `json:"display_name"`
+	Email             pgtype.Text        `json:"email"`
+	AvatarUrl         pgtype.Text        `json:"avatar_url"`
+	UserID            pgtype.UUID        `json:"user_id"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+}
+
+type ExternalIssueLink struct {
+	ID              pgtype.UUID        `json:"id"`
+	WorkspaceID     pgtype.UUID        `json:"workspace_id"`
+	IssueID         pgtype.UUID        `json:"issue_id"`
+	SyncSourceID    pgtype.UUID        `json:"sync_source_id"`
+	ExternalID      string             `json:"external_id"`
+	ExternalKey     string             `json:"external_key"`
+	WebUrl          string             `json:"web_url"`
+	RemoteUpdatedAt pgtype.Timestamptz `json:"remote_updated_at"`
+	LastPushedHash  string             `json:"last_pushed_hash"`
+	SyncError       pgtype.Text        `json:"sync_error"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+}
+
 type Feedback struct {
 	ID          pgtype.UUID        `json:"id"`
 	UserID      pgtype.UUID        `json:"user_id"`
@@ -627,9 +667,59 @@ type IssueSubscriber struct {
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
+type IssueSyncOutbox struct {
+	ID            pgtype.UUID        `json:"id"`
+	WorkspaceID   pgtype.UUID        `json:"workspace_id"`
+	SyncSourceID  pgtype.UUID        `json:"sync_source_id"`
+	IssueID       pgtype.UUID        `json:"issue_id"`
+	Op            string             `json:"op"`
+	Payload       []byte             `json:"payload"`
+	Status        string             `json:"status"`
+	Attempts      int32              `json:"attempts"`
+	NextAttemptAt pgtype.Timestamptz `json:"next_attempt_at"`
+	LastError     pgtype.Text        `json:"last_error"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+}
+
+type IssueSyncSource struct {
+	ID             pgtype.UUID        `json:"id"`
+	WorkspaceID    pgtype.UUID        `json:"workspace_id"`
+	ProjectID      pgtype.UUID        `json:"project_id"`
+	Provider       string             `json:"provider"`
+	ConnectionID   pgtype.UUID        `json:"connection_id"`
+	ExternalRef    []byte             `json:"external_ref"`
+	ExternalKey    string             `json:"external_key"`
+	StatusMapping  []byte             `json:"status_mapping"`
+	SyncEnabled    bool               `json:"sync_enabled"`
+	PushDefault    bool               `json:"push_default"`
+	BackfillStatus string             `json:"backfill_status"`
+	BackfillCursor pgtype.Text        `json:"backfill_cursor"`
+	CreatedBy      pgtype.UUID        `json:"created_by"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
 type IssueToLabel struct {
 	IssueID pgtype.UUID `json:"issue_id"`
 	LabelID pgtype.UUID `json:"label_id"`
+}
+
+type JiraConnection struct {
+	ID                     pgtype.UUID        `json:"id"`
+	WorkspaceID            pgtype.UUID        `json:"workspace_id"`
+	CloudID                string             `json:"cloud_id"`
+	SiteUrl                string             `json:"site_url"`
+	AccountID              string             `json:"account_id"`
+	AccountEmail           pgtype.Text        `json:"account_email"`
+	AccountAvatarUrl       pgtype.Text        `json:"account_avatar_url"`
+	AccessTokenEncrypted   []byte             `json:"access_token_encrypted"`
+	RefreshTokenEncrypted  []byte             `json:"refresh_token_encrypted"`
+	TokenExpiresAt         pgtype.Timestamptz `json:"token_expires_at"`
+	WebhookSecretEncrypted []byte             `json:"webhook_secret_encrypted"`
+	ConnectedByID          pgtype.UUID        `json:"connected_by_id"`
+	CreatedAt              pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt              pgtype.Timestamptz `json:"updated_at"`
 }
 
 type LarkBindingToken struct {

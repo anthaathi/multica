@@ -36,7 +36,8 @@
       "gitlab": "GitLab",
       "integrations": "連携",
       "labs": "ラボ",
-      "members": "メンバー"
+      "members": "メンバー",
+      "jira": "Jira"
     }
   },
   "account": {
@@ -490,5 +491,28 @@
         "description": "イシューの作成と作業"
       }
     }
+  },
+  "jira": {
+    "page_description": "Jira アカウントを接続し、Multica プロジェクトと双方向に課題を同期します。",
+    "section_connection": "接続",
+    "connection_title": "Jira",
+    "connection_description": "Jira Cloud アカウントを接続すると、プロジェクトに Jira プロジェクトを同期ソースとして追加できます。",
+    "connected_to": "{{site}} に {{email}} として接続済み",
+    "connect_jira": "Jira を接続",
+    "connect_opening": "開いています…",
+    "connect_disabled_tooltip": "このサーバーでは Jira が設定されていません",
+    "disconnect": "切断",
+    "disconnecting": "切断しています…",
+    "disconnect_confirm_title": "Jira を切断",
+    "disconnect_confirm_description": "Multica はこの Jira 接続との同期を停止します。この接続を使用する同期ソースは削除されます。リンク済みの課題は保持されます。",
+    "disconnect_confirm_cancel": "キャンセル",
+    "disconnect_confirm_action": "切断",
+    "not_configured": "このデプロイでは Jira 連携が設定されていません。運用者が Jira シークレットキーを設定する必要があります。",
+    "read_only_hint": "読み取り専用ビュー。ワークスペースの管理者とオーナーのみが Jira を接続または切断できます。",
+    "contact_admin_to_connect": "このワークスペースでは Jira が接続されていません。管理者またはオーナーに設定を依頼してください。",
+    "toast_not_configured": "このデプロイでは Jira 連携が設定されていません",
+    "toast_open_failed": "Jira の接続画面を開けませんでした",
+    "toast_disconnect_failed": "Jira の切断に失敗しました",
+    "toast_disconnected": "Jira を切断しました"
   }
 }

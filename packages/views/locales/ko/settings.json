@@ -36,7 +36,8 @@
       "gitlab": "GitLab",
       "integrations": "연동",
       "labs": "실험실",
-      "members": "멤버"
+      "members": "멤버",
+      "jira": "Jira"
     }
   },
   "account": {
@@ -490,5 +491,28 @@
     "byo_cancel": "취소",
     "byo_success_toast": "Slack 봇을 연결했어요",
     "byo_failed_toast": "Slack 봇을 연결하지 못했어요"
+  },
+  "jira": {
+    "page_description": "Jira 계정을 연결하여 Multica 프로젝트와 양방향으로 이슈를 동기화합니다.",
+    "section_connection": "연결",
+    "connection_title": "Jira",
+    "connection_description": "Jira Cloud 계정을 연결하면 프로젝트에 Jira 프로젝트를 동기화 소스로 추가할 수 있습니다.",
+    "connected_to": "{{site}}에 {{email}} 계정으로 연결됨",
+    "connect_jira": "Jira 연결",
+    "connect_opening": "여는 중…",
+    "connect_disabled_tooltip": "이 서버에는 Jira가 구성되어 있지 않습니다",
+    "disconnect": "연결 해제",
+    "disconnecting": "연결을 해제하는 중…",
+    "disconnect_confirm_title": "Jira 연결 해제",
+    "disconnect_confirm_description": "Multica가 이 Jira 연결과의 동기화를 중지합니다. 이 연결을 사용하는 동기화 소스는 제거되며, 연결된 이슈는 유지됩니다.",
+    "disconnect_confirm_cancel": "취소",
+    "disconnect_confirm_action": "연결 해제",
+    "not_configured": "이 배포에서는 Jira 연동이 구성되어 있지 않습니다. 운영자가 Jira 시크릿 키를 설정해야 합니다.",
+    "read_only_hint": "읽기 전용 보기입니다. 워크스페이스 관리자와 소유자만 Jira를 연결하거나 해제할 수 있습니다.",
+    "contact_admin_to_connect": "이 워크스페이스에는 Jira가 연결되어 있지 않습니다. 관리자나 소유자에게 설정을 요청하세요.",
+    "toast_not_configured": "이 배포에서는 Jira 연동이 구성되어 있지 않습니다",
+    "toast_open_failed": "Jira 연결 화면을 열지 못했습니다",
+    "toast_disconnect_failed": "Jira 연결 해제에 실패했습니다",
+    "toast_disconnected": "Jira 연결이 해제되었습니다"
   }
 }
