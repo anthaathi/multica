@@ -16,6 +16,7 @@ import (
 	"unicode"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/multica-ai/multica/server/internal/issueguard"
 	"github.com/multica-ai/multica/server/internal/logger"
@@ -421,20 +422,34 @@ func buildSearchQuery(phrase string, terms []string, queryNum int, hasNum bool, 
 	// --- WHERE clause ---
 	var whereParts []string
 
-	// Full phrase match: title, description, or comment
+	// Full phrase match: title, description, or comment.
+	//
+	// The comment EXISTS subquery is deliberately correlated on BOTH
+	// c.issue_id = i.id AND c.workspace_id = wsParam. The workspace_id
+	// filter is not strictly necessary for correctness (comment.workspace_id
+	// is FK-consistent with its issue's workspace), but it is critical for
+	// the planner. Without it, Postgres rewrites the correlated EXISTS
+	// into a hashed subplan that materializes every comment in the entire
+	// `comment` table matching the LIKE — for common tokens like "search"
+	// this can be hundreds of thousands of rows, blowing out work_mem into
+	// a lossy bitmap and taking 30+ seconds. With the workspace_id
+	// constant duplicated into the subquery, the hashed set collapses to
+	// this workspace's comments and the plan uses the supporting
+	// idx_comment_workspace (migration 135). See MUL-4059 EXPLAIN reports.
 	phraseMatch := fmt.Sprintf(
-		"(LOWER(i.title) LIKE %s OR LOWER(COALESCE(i.description, '')) LIKE %s OR EXISTS (SELECT 1 FROM comment c WHERE c.issue_id = i.id AND LOWER(c.content) LIKE %s))",
-		phraseContainsParam, phraseContainsParam, phraseContainsParam,
+		"(LOWER(i.title) LIKE %s OR LOWER(COALESCE(i.description, '')) LIKE %s OR EXISTS (SELECT 1 FROM comment c WHERE c.issue_id = i.id AND c.workspace_id = %s AND LOWER(c.content) LIKE %s))",
+		phraseContainsParam, phraseContainsParam, wsParam, phraseContainsParam,
 	)
 	whereParts = append(whereParts, phraseMatch)
 
-	// Multi-word AND match (each term must appear somewhere)
+	// Multi-word AND match (each term must appear somewhere). Same
+	// workspace_id-in-subquery contract as above.
 	if len(termContainsParams) > 1 {
 		var termConditions []string
 		for _, tp := range termContainsParams {
 			termConditions = append(termConditions, fmt.Sprintf(
-				"(LOWER(i.title) LIKE %s OR LOWER(COALESCE(i.description, '')) LIKE %s OR EXISTS (SELECT 1 FROM comment c WHERE c.issue_id = i.id AND LOWER(c.content) LIKE %s))",
-				tp, tp, tp,
+				"(LOWER(i.title) LIKE %s OR LOWER(COALESCE(i.description, '')) LIKE %s OR EXISTS (SELECT 1 FROM comment c WHERE c.issue_id = i.id AND c.workspace_id = %s AND LOWER(c.content) LIKE %s))",
+				tp, tp, wsParam, tp,
 			))
 		}
 		whereParts = append(whereParts, "("+strings.Join(termConditions, " AND ")+")")
@@ -492,8 +507,9 @@ func buildSearchQuery(phrase string, terms []string, queryNum int, hasNum bool, 
 		rankCases = append(rankCases, fmt.Sprintf("WHEN (%s) THEN 6", strings.Join(descTerms, " AND ")))
 	}
 
-	// Tier 7: Comment contains phrase
-	rankCases = append(rankCases, fmt.Sprintf("WHEN EXISTS (SELECT 1 FROM comment c WHERE c.issue_id = i.id AND LOWER(c.content) LIKE %s) THEN 7", phraseContainsParam))
+	// Tier 7: Comment contains phrase. Same workspace_id-in-subquery
+	// contract as the WHERE clause; see the phraseMatch comment above.
+	rankCases = append(rankCases, fmt.Sprintf("WHEN EXISTS (SELECT 1 FROM comment c WHERE c.issue_id = i.id AND c.workspace_id = %s AND LOWER(c.content) LIKE %s) THEN 7", wsParam, phraseContainsParam))
 
 	// Tier 8: Comment matches all words (multi-word only)
 	if len(termContainsParams) > 1 {
@@ -501,7 +517,7 @@ func buildSearchQuery(phrase string, terms []string, queryNum int, hasNum bool, 
 		for _, tp := range termContainsParams {
 			commentTerms = append(commentTerms, fmt.Sprintf("LOWER(c.content) LIKE %s", tp))
 		}
-		rankCases = append(rankCases, fmt.Sprintf("WHEN EXISTS (SELECT 1 FROM comment c WHERE c.issue_id = i.id AND (%s)) THEN 8", strings.Join(commentTerms, " AND ")))
+		rankCases = append(rankCases, fmt.Sprintf("WHEN EXISTS (SELECT 1 FROM comment c WHERE c.issue_id = i.id AND c.workspace_id = %s AND (%s)) THEN 8", wsParam, strings.Join(commentTerms, " AND ")))
 	}
 
 	rankExpr := "CASE " + strings.Join(rankCases, " ") + " ELSE 9 END"
@@ -548,12 +564,15 @@ func buildSearchQuery(phrase string, terms []string, queryNum int, hasNum bool, 
 	// --- matched_comment_content subquery ---
 	// Always return matching comment content regardless of match_source,
 	// so frontend can display comment snippet alongside title/description matches.
+	// The c.workspace_id filter mirrors the WHERE clause: without it,
+	// the planner can pick a global comment scan that ignores workspace
+	// scoping.
 	commentSubquery := fmt.Sprintf(`COALESCE(
 		(SELECT c.content FROM comment c
-		 WHERE c.issue_id = i.id AND LOWER(c.content) LIKE %s
+		 WHERE c.issue_id = i.id AND c.workspace_id = %s AND LOWER(c.content) LIKE %s
 		 ORDER BY c.created_at DESC LIMIT 1),
 		''
-	)`, phraseContainsParam)
+	)`, wsParam, phraseContainsParam)
 
 	if len(termContainsParams) > 1 {
 		var commentTerms []string
@@ -562,10 +581,10 @@ func buildSearchQuery(phrase string, terms []string, queryNum int, hasNum bool, 
 		}
 		commentSubquery = fmt.Sprintf(`COALESCE(
 			(SELECT c.content FROM comment c
-			 WHERE c.issue_id = i.id AND (LOWER(c.content) LIKE %s OR (%s))
+			 WHERE c.issue_id = i.id AND c.workspace_id = %s AND (LOWER(c.content) LIKE %s OR (%s))
 			 ORDER BY c.created_at DESC LIMIT 1),
 			''
-		)`, phraseContainsParam, strings.Join(commentTerms, " AND "))
+		)`, wsParam, phraseContainsParam, strings.Join(commentTerms, " AND "))
 	}
 
 	limitParam := nextArg(nil)  // placeholder
@@ -636,50 +655,56 @@ func (h *Handler) SearchIssues(w http.ResponseWriter, r *http.Request) {
 	args[len(args)-2] = limit
 	args[len(args)-1] = offset
 
-	rows, err := h.DB.Query(ctx, sqlQuery, args...)
-	if err != nil {
-		slog.Warn("search issues failed", "error", err, "workspace_id", workspaceID, "query", q)
-		writeError(w, http.StatusInternalServerError, "failed to search issues")
-		return
-	}
-	defer rows.Close()
-
 	var results []searchResult
-	for rows.Next() {
-		var sr searchResult
-		if err := rows.Scan(
-			&sr.issue.ID,
-			&sr.issue.WorkspaceID,
-			&sr.issue.Title,
-			&sr.issue.Description,
-			&sr.issue.Status,
-			&sr.issue.Priority,
-			&sr.issue.AssigneeType,
-			&sr.issue.AssigneeID,
-			&sr.issue.CreatorType,
-			&sr.issue.CreatorID,
-			&sr.issue.ParentIssueID,
-			&sr.issue.AcceptanceCriteria,
-			&sr.issue.ContextRefs,
-			&sr.issue.Position,
-			&sr.issue.StartDate,
-			&sr.issue.DueDate,
-			&sr.issue.CreatedAt,
-			&sr.issue.UpdatedAt,
-			&sr.issue.Number,
-			&sr.issue.ProjectID,
-			&sr.totalCount,
-			&sr.matchSource,
-			&sr.matchedCommentContent,
-		); err != nil {
-			slog.Warn("search issues scan failed", "error", err)
-			writeError(w, http.StatusInternalServerError, "failed to search issues")
+	err := runSearchQuery(ctx, h.TxStarter, sqlQuery, args, func(rows pgx.Rows) error {
+		for rows.Next() {
+			var sr searchResult
+			if err := rows.Scan(
+				&sr.issue.ID,
+				&sr.issue.WorkspaceID,
+				&sr.issue.Title,
+				&sr.issue.Description,
+				&sr.issue.Status,
+				&sr.issue.Priority,
+				&sr.issue.AssigneeType,
+				&sr.issue.AssigneeID,
+				&sr.issue.CreatorType,
+				&sr.issue.CreatorID,
+				&sr.issue.ParentIssueID,
+				&sr.issue.AcceptanceCriteria,
+				&sr.issue.ContextRefs,
+				&sr.issue.Position,
+				&sr.issue.StartDate,
+				&sr.issue.DueDate,
+				&sr.issue.CreatedAt,
+				&sr.issue.UpdatedAt,
+				&sr.issue.Number,
+				&sr.issue.ProjectID,
+				&sr.totalCount,
+				&sr.matchSource,
+				&sr.matchedCommentContent,
+			); err != nil {
+				return fmt.Errorf("scan: %w", err)
+			}
+			results = append(results, sr)
+		}
+		return rows.Err()
+	})
+	if err != nil {
+		// Statement-timeout surfaces as SQLSTATE 57014. Return a 503
+		// so the frontend can distinguish a timeout ("try a more
+		// specific query") from a generic 500. This is the fail-fast
+		// path when GIN search indexes are absent or the database is
+		// overloaded; see runSearchQuery header for context.
+		if isSearchStatementTimeout(err) {
+			slog.Warn("search issues timed out",
+				"workspace_id", workspaceID,
+				"query", q,
+				"timeout", searchStatementTimeout)
+			writeError(w, http.StatusServiceUnavailable, "search timed out; please refine your query or try again")
 			return
 		}
-		results = append(results, sr)
-	}
-	if err := rows.Err(); err != nil {
-		slog.Warn("search issues rows error", "error", err)
+		slog.Warn("search issues failed", "error", err, "workspace_id", workspaceID, "query", q)
 		writeError(w, http.StatusInternalServerError, "failed to search issues")
 		return
 	}
