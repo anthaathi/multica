@@ -527,6 +527,7 @@ func (p *JiraProvider) CreateIssue(ctx context.Context, src db.IssueSyncSource, 
 		"summary":     out.Title,
 		"description": json.RawMessage(MarkdownToADF(out.Description)),
 		"project":     map[string]any{"key": ref.Key},
+		"issuetype":   map[string]any{"name": "Task"},
 		"labels":      nonNilLabels(out.Labels),
 	}
 	if out.AssigneeAccountID != "" {

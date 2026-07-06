@@ -649,3 +649,47 @@ func (e *Engine) SyncIssue(ctx context.Context, src db.IssueSyncSource, issueID 
 	}
 	return e.EnqueueOutbound(ctx, src, issueID, "create_remote", nil)
 }
+
+// PollSource fetches the most recent page of remote issues for a source and
+// applies each through ApplyRemote (idempotent — unchanged issues are dropped
+// by the stale-replay + content-hash checks). This is the webhook fallback:
+// the scheduler calls it every 10 minutes so changes land even when the
+// provider's webhook delivery is absent or delayed.
+func (e *Engine) PollSource(ctx context.Context, src db.IssueSyncSource) {
+	provider := e.Provider(src.Provider)
+	if provider == nil {
+		return
+	}
+	issues, _, err := provider.ListIssues(ctx, src, "")
+	if err != nil {
+		slog.Warn("issuesync: poll source failed",
+			"source_id", util.UUIDToString(src.ID), "provider", src.Provider, "error", err)
+		return
+	}
+	applied := 0
+	for _, remote := range issues {
+		if err := e.ApplyRemote(ctx, src, IssueEvent{Kind: "issue", Issue: remote}); err == nil {
+			applied++
+		}
+	}
+	if applied > 0 {
+		slog.Info("issuesync: poll applied updates",
+			"source_id", util.UUIDToString(src.ID), "provider", src.Provider, "applied", applied)
+	}
+}
+
+// PollAllSources iterates every enabled sync source and polls it. Called by
+// the scheduler job every 10 minutes.
+func (e *Engine) PollAllSources(ctx context.Context) {
+	if e.Queries == nil {
+		return
+	}
+	sources, err := e.Queries.ListEnabledIssueSyncSources(ctx)
+	if err != nil {
+		slog.Warn("issuesync: poll list sources failed", "error", err)
+		return
+	}
+	for _, src := range sources {
+		e.PollSource(ctx, src)
+	}
+}

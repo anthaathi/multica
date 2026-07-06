@@ -579,6 +579,8 @@ func (h *Handler) createGitLabProjectHook(ctx context.Context, baseURL, accessTo
 		"token":                   {secret},
 		"merge_requests_events":   {"true"},
 		"pipeline_events":         {"true"},
+		"issues_events":           {"true"},
+		"note_events":             {"true"},
 		"enable_ssl_verification": {"true"},
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(form.Encode()))

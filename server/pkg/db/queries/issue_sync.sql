@@ -22,6 +22,13 @@ SELECT * FROM issue_sync_source
 WHERE workspace_id = $1
 ORDER BY created_at ASC;
 
+-- name: ListEnabledIssueSyncSources :many
+-- Polling fallback: every enabled source across all workspaces. The scheduler
+-- job iterates this list and pulls recent changes when webhooks are absent.
+SELECT * FROM issue_sync_source
+WHERE sync_enabled
+ORDER BY created_at ASC;
+
 -- name: GetIssueSyncSource :one
 SELECT * FROM issue_sync_source
 WHERE id = $1;

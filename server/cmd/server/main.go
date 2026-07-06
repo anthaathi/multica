@@ -445,6 +445,14 @@ func main() {
 	if err := schedulerMgr.Register(scheduler.AutopilotScheduleDispatchJob(pool, queries, autopilotSvc)); err != nil {
 		slog.Warn("scheduler: failed to register autopilot_schedule_dispatch job", "error", err)
 	}
+	// Issue sync polling fallback: pulls recent changes from every enabled
+	// sync source every 10 minutes when webhooks are absent or delayed.
+	// ApplyRemote is idempotent so a no-change poll is a cheap no-op.
+	if h.IssueSync != nil {
+		if err := schedulerMgr.Register(scheduler.IssueSyncPollJob(h.IssueSync)); err != nil {
+			slog.Warn("scheduler: failed to register issue_sync_poll job", "error", err)
+		}
+	}
 	go func() {
 		_ = schedulerMgr.Run(sweepCtx)
 	}()

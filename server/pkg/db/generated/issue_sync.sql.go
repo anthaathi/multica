@@ -623,6 +623,50 @@ func (q *Queries) GetIssueSyncSourceInWorkspace(ctx context.Context, arg GetIssu
 	return i, err
 }
 
+const listEnabledIssueSyncSources = `-- name: ListEnabledIssueSyncSources :many
+SELECT id, workspace_id, project_id, provider, connection_id, external_ref, external_key, status_mapping, sync_enabled, push_default, backfill_status, backfill_cursor, created_by, created_at, updated_at FROM issue_sync_source
+WHERE sync_enabled
+ORDER BY created_at ASC
+`
+
+// Polling fallback: every enabled source across all workspaces. The scheduler
+// job iterates this list and pulls recent changes when webhooks are absent.
+func (q *Queries) ListEnabledIssueSyncSources(ctx context.Context) ([]IssueSyncSource, error) {
+	rows, err := q.db.Query(ctx, listEnabledIssueSyncSources)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []IssueSyncSource{}
+	for rows.Next() {
+		var i IssueSyncSource
+		if err := rows.Scan(
+			&i.ID,
+			&i.WorkspaceID,
+			&i.ProjectID,
+			&i.Provider,
+			&i.ConnectionID,
+			&i.ExternalRef,
+			&i.ExternalKey,
+			&i.StatusMapping,
+			&i.SyncEnabled,
+			&i.PushDefault,
+			&i.BackfillStatus,
+			&i.BackfillCursor,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listExternalIssueLinksByIssue = `-- name: ListExternalIssueLinksByIssue :many
 SELECT id, workspace_id, issue_id, sync_source_id, external_id, external_key, web_url, remote_updated_at, last_pushed_hash, sync_error, created_at, updated_at FROM external_issue_link
 WHERE issue_id = $1

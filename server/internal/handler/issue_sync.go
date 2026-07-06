@@ -279,6 +279,12 @@ func (h *Handler) CreateSyncSource(w http.ResponseWriter, r *http.Request) {
 	if syncEnabled && h.IssueSync != nil {
 		go h.IssueSync.RunBackfill(context.Background(), source)
 	}
+	// GitLab: register a project webhook with issues_events + note_events so
+	// inbound changes flow back. The workspace-level registration only covers
+	// repos in the workspace registry; sync-source projects need their own.
+	if source.Provider == issuesync.ProviderGitLab && h.GitLabBox != nil {
+		go h.registerSyncSourceGitLabWebhook(context.Background(), source)
+	}
 
 	h.publish(protocol.EventIssueSyncSourceCreated, uuidToString(project.WorkspaceID), "member", userIDStr, map[string]any{
 		"source_id":  uuidToString(source.ID),
@@ -863,6 +869,41 @@ func (h *Handler) handleGitLabNoteEvent(ctx context.Context, conn db.GitlabConne
 	h.applyRemoteIssueWebhook(ctx, issuesync.ProviderGitLab, key, issuesync.IssueEvent{
 		Kind: "comment", Issue: issue, Comment: &comment,
 	})
+}
+
+// registerSyncSourceGitLabWebhook registers a project webhook on the GitLab
+// project attached as a sync source, requesting issues_events + note_events so
+// inbound changes reach the sync engine. Best-effort — failures are logged.
+func (h *Handler) registerSyncSourceGitLabWebhook(ctx context.Context, src db.IssueSyncSource) {
+	var ref struct {
+		PathWithNamespace string `json:"path_with_namespace"`
+	}
+	if err := json.Unmarshal(src.ExternalRef, &ref); err != nil || ref.PathWithNamespace == "" {
+		return
+	}
+	conn, err := h.Queries.GetGitLabConnectionByID(ctx, src.ConnectionID)
+	if err != nil {
+		slog.Warn("issue_sync: load gitlab connection for webhook registration failed", "error", err)
+		return
+	}
+	token, err := h.GitLabBox.Open(conn.AccessTokenEncrypted)
+	if err != nil {
+		slog.Warn("issue_sync: decrypt gitlab token for webhook registration failed", "error", err)
+		return
+	}
+	secret, err := h.GitLabBox.Open(conn.WebhookSecretEncrypted)
+	if err != nil {
+		slog.Warn("issue_sync: decrypt gitlab webhook secret failed", "error", err)
+		return
+	}
+	whURL := gitlabWebhookURL()
+	if whURL == "" {
+		return
+	}
+	if err := h.createGitLabProjectHook(ctx, gitlabInternalURL(), string(token), ref.PathWithNamespace, whURL, string(secret)); err != nil {
+		slog.Warn("issue_sync: gitlab webhook registration for sync source failed",
+			"project", ref.PathWithNamespace, "error", err)
+	}
 }
 
 // Jira connection handlers (ListJiraConnections, DeleteJiraConnection,
