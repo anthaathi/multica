@@ -294,6 +294,35 @@ export function createEnDict(allowSignup: boolean): LandingDict {
     },
     entries: [
       {
+        version: "0.3.39",
+        date: "2026-07-06",
+        title: "Qoder and Trae CLI as custom runtime bases, plus squad and stability fixes",
+        changes: [],
+        features: [
+          "You can now build custom runtime profiles on top of Qoder, including for Qoder CN users.",
+          "ByteDance Trae CLI is also available as a base for custom runtime profiles.",
+        ],
+        improvements: [
+          "The runtime provider page and public docs now show the full lineup of built-in runtimes, including Qoder and Trae CLI, across every localized site.",
+        ],
+        fixes: [
+          "Multi-stage squad flows no longer stall at the first stage when the squad leader is private and a sub-Issue is closed by an agent.",
+          "A parent Issue's staged sub-task-done note no longer wrongly claims an intermediate stage is the final one — the leader is offered both options and picks.",
+          "Several agents can now share a local repo checkout while a squad leader wraps up — the leader no longer holds the checkout lock.",
+          "Multi-hour agent tasks — long research, training, or codegen runs — are no longer killed by the server while your daemon is still alive.",
+          "Search no longer hangs on self-hosted setups — even large workspaces return results quickly on the first try.",
+          "The Issue and comment editor no longer freezes when you paste a long stacktrace or an unusual long string.",
+          "The Antigravity agent no longer fails to start on machines where Claude is also installed.",
+          "Browser MCP now starts correctly on Windows agents.",
+          "The Codex agent's MCP settings are applied correctly again.",
+          "The Pi agent's task result now shows only the final answer — intermediate thinking is hidden.",
+          "Autopilots no longer accidentally run the same Issue twice in a row when a run takes longer than expected.",
+          "An Issue's PR list only shows PRs that really target that Issue — PRs that just mention the key in passing (\"Related to MUL-…\") no longer appear.",
+          "The Issue action menu's nested \"More\" item is now called \"Relations\", so you can tell what's inside without opening it.",
+          "Every attachment upload button — chat, Issue creation, Issue description, feedback — now lets you pick multiple files at once from the system file dialog.",
+        ],
+      },
+      {
         version: "0.3.36",
         date: "2026-07-03",
         title: "Transcript view memory, external PostgreSQL for Helm, and reliability fixes",

@@ -294,6 +294,35 @@ export function createZhDict(allowSignup: boolean): LandingDict {
     },
     entries: [
       {
+        version: "0.3.39",
+        date: "2026-07-06",
+        title: "Qoder 与 TRAE CLI 加入自定义运行时基座，小队与稳定性修复",
+        changes: [],
+        features: [
+          "你现在可以基于 Qoder 搭建自定义运行时了，Qoder CN 用户也能直接用。",
+          "字节 TRAE CLI 也可以作为自定义运行时的基座。",
+        ],
+        improvements: [
+          "运行时供应商页和公开文档更新到当前所有内置运行时的完整名单，包括 Qoder 与 TRAE CLI，四种语言同步。",
+        ],
+        fixes: [
+          "多阶段小队流程在私有 Leader + 子 Issue 由智能体关闭的情况下，不再卡在第一阶段。",
+          "父 Issue 的「子任务完成」提示不再把中间阶段错说成最终阶段，小队 Leader 可以自己选择继续下一阶段还是收尾。",
+          "小队 Leader 在收尾阶段不再占用本地仓库的锁，同一个仓库里的多个智能体可以继续并行工作。",
+          "多小时的智能体任务（研究、训练、代码生成）不再被服务端误杀，只要本机后台还活着就会跑完。",
+          "自托管环境下的搜索不再卡死，大工作区里首次搜索也能秒回。",
+          "在 Issue 或评论编辑器里粘贴长报错堆栈或异常长的字符串时不再卡页面。",
+          "同时装了 Claude 的机器上，Antigravity 智能体不再启动失败。",
+          "Windows 上的 Browser MCP 现在能正常启动。",
+          "Codex 智能体的 MCP 设置能被正确读取了。",
+          "Pi 智能体的任务结果只显示最终答案，不再夹带中间步骤。",
+          "自动驾驶不再在单次运行超时的时候重复派发同一个 Issue。",
+          "Issue 的 PR 列表只显示真正关联到本 Issue 的 PR，仅在描述里顺带提到「Related to MUL-…」的 PR 不再露出。",
+          "Issue 操作菜单里嵌套的「More」项改名为「Relations」，你不用点开也知道里面装的是关系类操作。",
+          "所有附件上传按钮——对话输入、Issue 创建、Issue 描述、反馈——都支持在系统对话框里一次选多个文件。",
+        ],
+      },
+      {
         version: "0.3.36",
         date: "2026-07-03",
         title: "任务日志偏好记忆、Helm 外部 PostgreSQL 支持，与稳定性修复",
