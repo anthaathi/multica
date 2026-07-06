@@ -9,9 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -466,19 +464,23 @@ func (p *JiraProvider) ListIssues(ctx context.Context, src db.IssueSyncSource, c
 	if err != nil {
 		return nil, "", err
 	}
-	startAt := 0
+	// Jira deprecated GET /rest/api/3/search (returns 410, CHANGE-2046).
+	// The replacement is POST /rest/api/3/search/jql with cursor-based
+	// pagination via nextPageToken (an opaque string, not startAt/total).
+	body := map[string]any{
+		"jql":        fmt.Sprintf("project = %s AND statusCategory in (\"To Do\", \"In Progress\")", ref.Key),
+		"fields":     []string{"*all"},
+		"maxResults": 100,
+	}
 	if cursor != "" {
-		if n, err := strconv.Atoi(cursor); err == nil && n > 0 {
-			startAt = n
-		}
+		body["nextPageToken"] = cursor
 	}
-	jql := fmt.Sprintf("project = %s AND statusCategory in (\"To Do\", \"In Progress\")", ref.Key)
-	path := fmt.Sprintf("/search?jql=%s&fields=*all&maxResults=100&startAt=%d", url.QueryEscape(jql), startAt)
 	var out struct {
-		Issues []json.RawMessage `json:"issues"`
-		Total  int               `json:"total"`
+		Issues        []json.RawMessage `json:"issues"`
+		NextPageToken string            `json:"nextPageToken"`
+		IsLast        bool              `json:"isLast"`
 	}
-	if err := p.do(ctx, conn, http.MethodGet, path, nil, &out); err != nil {
+	if err := p.do(ctx, conn, http.MethodPost, "/search/jql", body, &out); err != nil {
 		return nil, "", err
 	}
 	issues := make([]ExternalIssue, 0, len(out.Issues))
@@ -488,8 +490,8 @@ func (p *JiraProvider) ListIssues(ctx context.Context, src db.IssueSyncSource, c
 		}
 	}
 	next := ""
-	if len(out.Issues) == 100 && startAt+100 < out.Total {
-		next = strconv.Itoa(startAt + 100)
+	if !out.IsLast && out.NextPageToken != "" {
+		next = out.NextPageToken
 	}
 	return issues, next, nil
 }
