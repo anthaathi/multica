@@ -42,6 +42,16 @@ ORDER BY created_at ASC, id ASC;
 -- name: DeleteGitLabConnection :exec
 DELETE FROM gitlab_connection WHERE id = $1 AND workspace_id = $2;
 
+-- name: UpdateGitLabConnectionTokens :exec
+-- GitLab rotates refresh tokens: every refresh returns a replacement and
+-- invalidates the old one, so both tokens are always written together.
+UPDATE gitlab_connection
+SET access_token_encrypted  = $2,
+    refresh_token_encrypted = $3,
+    token_expires_at        = $4,
+    updated_at              = now()
+WHERE id = $1;
+
 -- =====================
 -- GitLab Merge Request
 -- =====================

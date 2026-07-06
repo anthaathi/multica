@@ -535,6 +535,34 @@ func (q *Queries) UnlinkIssueFromMergeRequest(ctx context.Context, arg UnlinkIss
 	return err
 }
 
+const updateGitLabConnectionTokens = `-- name: UpdateGitLabConnectionTokens :exec
+UPDATE gitlab_connection
+SET access_token_encrypted  = $2,
+    refresh_token_encrypted = $3,
+    token_expires_at        = $4,
+    updated_at              = now()
+WHERE id = $1
+`
+
+type UpdateGitLabConnectionTokensParams struct {
+	ID                    pgtype.UUID        `json:"id"`
+	AccessTokenEncrypted  []byte             `json:"access_token_encrypted"`
+	RefreshTokenEncrypted []byte             `json:"refresh_token_encrypted"`
+	TokenExpiresAt        pgtype.Timestamptz `json:"token_expires_at"`
+}
+
+// GitLab rotates refresh tokens: every refresh returns a replacement and
+// invalidates the old one, so both tokens are always written together.
+func (q *Queries) UpdateGitLabConnectionTokens(ctx context.Context, arg UpdateGitLabConnectionTokensParams) error {
+	_, err := q.db.Exec(ctx, updateGitLabConnectionTokens,
+		arg.ID,
+		arg.AccessTokenEncrypted,
+		arg.RefreshTokenEncrypted,
+		arg.TokenExpiresAt,
+	)
+	return err
+}
+
 const upsertGitLabMergeRequest = `-- name: UpsertGitLabMergeRequest :one
 
 INSERT INTO gitlab_merge_request (

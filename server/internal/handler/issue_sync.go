@@ -886,9 +886,16 @@ func (h *Handler) registerSyncSourceGitLabWebhook(ctx context.Context, src db.Is
 		slog.Warn("issue_sync: load gitlab connection for webhook registration failed", "error", err)
 		return
 	}
-	token, err := h.GitLabBox.Open(conn.AccessTokenEncrypted)
+	// Resolve the token through the sync provider so an expired access token
+	// is refreshed instead of failing the registration with a 401.
+	provider, _ := h.IssueSync.Provider(issuesync.ProviderGitLab).(*issuesync.GitLabProvider)
+	if provider == nil {
+		slog.Warn("issue_sync: gitlab provider not registered; skipping webhook registration")
+		return
+	}
+	token, _, err := provider.TokenForConnection(ctx, util.UUIDToString(src.ConnectionID))
 	if err != nil {
-		slog.Warn("issue_sync: decrypt gitlab token for webhook registration failed", "error", err)
+		slog.Warn("issue_sync: resolve gitlab token for webhook registration failed", "error", err)
 		return
 	}
 	secret, err := h.GitLabBox.Open(conn.WebhookSecretEncrypted)
@@ -900,7 +907,7 @@ func (h *Handler) registerSyncSourceGitLabWebhook(ctx context.Context, src db.Is
 	if whURL == "" {
 		return
 	}
-	if err := h.createGitLabProjectHook(ctx, gitlabInternalURL(), string(token), ref.PathWithNamespace, whURL, string(secret)); err != nil {
+	if err := h.createGitLabProjectHook(ctx, gitlabInternalURL(), token, ref.PathWithNamespace, whURL, string(secret)); err != nil {
 		slog.Warn("issue_sync: gitlab webhook registration for sync source failed",
 			"project", ref.PathWithNamespace, "error", err)
 	}

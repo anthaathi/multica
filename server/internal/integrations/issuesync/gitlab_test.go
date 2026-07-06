@@ -6,9 +6,13 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/multica-ai/multica/server/internal/util/secretbox"
 	db "github.com/multica-ai/multica/server/pkg/db/generated"
 )
 
@@ -405,5 +409,82 @@ func TestGitLabCreateIssueRoundTrip(t *testing.T) {
 	// state_event must NOT be sent on POST (issues start opened).
 	if _, hasState := sent["state_event"]; hasState {
 		t.Error("state_event should be absent on POST")
+	}
+}
+
+// TestGitLabRefreshTokenRotation verifies the rotation contract: a refresh
+// exchange persists the NEW refresh_token from the response (GitLab rotates
+// refresh tokens and invalidates the old one). If the old token were
+// re-persisted, every refresh after the first 2-hour expiry would fail with
+// invalid_grant and the connection would brick.
+func TestGitLabRefreshTokenRotation(t *testing.T) {
+	var gotForm url.Values
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/oauth/token" {
+			t.Errorf("refresh hit %s, want /oauth/token", r.URL.Path)
+		}
+		body, _ := io.ReadAll(r.Body)
+		gotForm, _ = url.ParseQuery(string(body))
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"access_token":"new-access","refresh_token":"rotated-refresh","expires_in":7200}`))
+	}))
+	defer ts.Close()
+
+	box, err := secretbox.New(make([]byte, 32))
+	if err != nil {
+		t.Fatalf("secretbox.New: %v", err)
+	}
+	oldRefreshSealed, err := box.Seal([]byte("old-refresh"))
+	if err != nil {
+		t.Fatalf("seal old refresh: %v", err)
+	}
+
+	conn := db.GitlabConnection{
+		ID:                    pgtype.UUID{Valid: true},
+		RefreshTokenEncrypted: oldRefreshSealed,
+		TokenExpiresAt:        pgtype.Timestamptz{Time: time.Now().Add(-time.Hour), Valid: true}, // expired
+	}
+	mock := &mockJiraDB{}
+	p := &GitLabProvider{Queries: db.New(mock), Box: box, Client: &http.Client{}}
+
+	tok, err := p.refreshAndStore(context.Background(), conn, ts.URL)
+	if err != nil {
+		t.Fatalf("refreshAndStore: %v", err)
+	}
+	if tok != "new-access" {
+		t.Fatalf("returned token = %q, want new-access", tok)
+	}
+	if gotForm.Get("grant_type") != "refresh_token" || gotForm.Get("refresh_token") != "old-refresh" {
+		t.Fatalf("refresh form = %v", gotForm)
+	}
+	// UpdateGitLabConnectionTokens Exec args: [id, access_encrypted, refresh_encrypted, expires_at]
+	if len(mock.execArgs) < 3 {
+		t.Fatalf("expected at least 3 exec args, got %d (%v)", len(mock.execArgs), mock.execArgs)
+	}
+	sealed, ok := mock.execArgs[2].([]byte)
+	if !ok {
+		t.Fatalf("refresh token arg is %T, want []byte", mock.execArgs[2])
+	}
+	plain, err := box.Open(sealed)
+	if err != nil {
+		t.Fatalf("decrypt persisted refresh token: %v", err)
+	}
+	if string(plain) != "rotated-refresh" {
+		t.Fatalf("persisted refresh token = %q, want rotated-refresh — rotation MUST persist the new token", string(plain))
+	}
+}
+
+func TestGitLabTokenNeedsRefresh(t *testing.T) {
+	if gitlabTokenNeedsRefresh(pgtype.Timestamptz{}) {
+		t.Error("no expiry recorded should not trigger refresh")
+	}
+	if !gitlabTokenNeedsRefresh(pgtype.Timestamptz{Time: time.Now().Add(-time.Minute), Valid: true}) {
+		t.Error("expired token must trigger refresh")
+	}
+	if !gitlabTokenNeedsRefresh(pgtype.Timestamptz{Time: time.Now().Add(30 * time.Second), Valid: true}) {
+		t.Error("token inside the 60s skew window must trigger refresh")
+	}
+	if gitlabTokenNeedsRefresh(pgtype.Timestamptz{Time: time.Now().Add(time.Hour), Valid: true}) {
+		t.Error("fresh token must not trigger refresh")
 	}
 }

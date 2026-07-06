@@ -23,12 +23,15 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/multica-ai/multica/server/internal/util"
 	"github.com/multica-ai/multica/server/internal/util/secretbox"
 	db "github.com/multica-ai/multica/server/pkg/db/generated"
@@ -94,8 +97,10 @@ func NewGitLabProvider(q *db.Queries, box *secretbox.Box) *GitLabProvider {
 
 func (p *GitLabProvider) Name() string { return ProviderGitLab }
 
-// defaultTokenForConn loads the connection, decrypts the access token, and
-// resolves the instance base URL (connection row → env fallback).
+// defaultTokenForConn loads the connection, decrypts the access token
+// (refreshing it first when it is at/near expiry — GitLab OAuth access tokens
+// live 2 hours), and resolves the instance base URL (connection row → env
+// fallback).
 func (p *GitLabProvider) defaultTokenForConn(ctx context.Context, connectionID string) (string, string, error) {
 	connUUID, err := util.ParseUUID(connectionID)
 	if err != nil {
@@ -108,10 +113,6 @@ func (p *GitLabProvider) defaultTokenForConn(ctx context.Context, connectionID s
 	if p.Box == nil {
 		return "", "", errors.New("issuesync: gitlab secretbox not configured")
 	}
-	plain, err := p.Box.Open(conn.AccessTokenEncrypted)
-	if err != nil {
-		return "", "", fmt.Errorf("decrypt gitlab access token: %w", err)
-	}
 	// API base: prefer GITLAB_INTERNAL_URL (in-cluster split-horizon DNS) over
 	// the connection's public GitlabBaseUrl — the public hostname often does
 	// not resolve from inside the cluster. Mirrors handler.gitlabInternalURL.
@@ -119,7 +120,138 @@ func (p *GitLabProvider) defaultTokenForConn(ctx context.Context, connectionID s
 	if baseURL == "" {
 		baseURL = strings.TrimSpace(conn.GitlabBaseUrl)
 	}
+	if gitlabTokenNeedsRefresh(conn.TokenExpiresAt) {
+		if tok, err := p.refreshAndStore(ctx, conn, baseURL); err == nil {
+			return tok, baseURL, nil
+		} else {
+			slog.Warn("issuesync: gitlab token refresh failed; trying cached token",
+				"error", err, "connection_id", util.UUIDToString(conn.ID))
+		}
+	}
+	plain, err := p.Box.Open(conn.AccessTokenEncrypted)
+	if err != nil {
+		return "", "", fmt.Errorf("decrypt gitlab access token: %w", err)
+	}
 	return string(plain), baseURL, nil
+}
+
+// TokenForConnection exposes the refresh-aware token resolution for callers
+// outside the provider's own REST paths (e.g. handler webhook registration),
+// so every GitLab API consumer benefits from the same expiry handling.
+func (p *GitLabProvider) TokenForConnection(ctx context.Context, connectionID string) (token, baseURL string, err error) {
+	return p.tokenForConn(ctx, connectionID)
+}
+
+// gitlabOAuthClientID / gitlabOAuthClientSecret mirror the handler's env reads
+// (issuesync may not import handler, which would create a cycle).
+func gitlabOAuthClientID() string { return strings.TrimSpace(os.Getenv("GITLAB_OAUTH_CLIENT_ID")) }
+func gitlabOAuthClientSecret() string {
+	return strings.TrimSpace(os.Getenv("GITLAB_OAUTH_CLIENT_SECRET"))
+}
+
+// gitlabOAuthRedirectURI rebuilds the redirect URI the connect flow registered
+// (handler.gitlabOAuthRedirectURI): the token refresh grant must carry the same
+// redirect_uri as the original authorization-code exchange.
+func gitlabOAuthRedirectURI() string {
+	base := strings.TrimRight(strings.TrimSpace(os.Getenv("MULTICA_PUBLIC_URL")), "/")
+	if base == "" {
+		base = strings.TrimRight(strings.TrimSpace(os.Getenv("FRONTEND_ORIGIN")), "/")
+	}
+	if base == "" {
+		return ""
+	}
+	return base + "/api/gitlab/oauth/callback"
+}
+
+func gitlabTokenNeedsRefresh(exp pgtype.Timestamptz) bool {
+	if !exp.Valid {
+		return false
+	}
+	return time.Now().After(exp.Time.Add(-60 * time.Second))
+}
+
+// gitlabTokenResponse is the /oauth/token response shape (refresh grant).
+// RefreshToken is always present: GitLab rotates refresh tokens and
+// invalidates the previous one, so the caller must persist the new value.
+type gitlabTokenResponse struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	ExpiresIn    int64  `json:"expires_in"`
+}
+
+// refreshAndStore exchanges the refresh token for a fresh pair and writes both
+// back to the connection. CRITICAL: GitLab rotates refresh tokens — the
+// response's refresh_token REPLACES the one we sent; if it is not persisted the
+// next refresh (and thus all future API calls) fails with invalid_grant.
+func (p *GitLabProvider) refreshAndStore(ctx context.Context, conn db.GitlabConnection, baseURL string) (string, error) {
+	if p.Box == nil {
+		return "", errors.New("issuesync: gitlab secretbox not configured")
+	}
+	if len(conn.RefreshTokenEncrypted) == 0 {
+		return "", errors.New("gitlab: no refresh token stored")
+	}
+	if baseURL == "" {
+		return "", errors.New("gitlab: base URL not configured")
+	}
+	refresh, err := p.Box.Open(conn.RefreshTokenEncrypted)
+	if err != nil {
+		return "", fmt.Errorf("gitlab: decrypt refresh token: %w", err)
+	}
+	form := url.Values{
+		"client_id":     {gitlabOAuthClientID()},
+		"client_secret": {gitlabOAuthClientSecret()},
+		"refresh_token": {string(refresh)},
+		"grant_type":    {"refresh_token"},
+	}
+	if uri := gitlabOAuthRedirectURI(); uri != "" {
+		form.Set("redirect_uri", uri)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		strings.TrimRight(baseURL, "/")+"/oauth/token", strings.NewReader(form.Encode()))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Accept", "application/json")
+	resp, err := p.Client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("gitlab token endpoint returned %d: %s", resp.StatusCode, string(body))
+	}
+	var tok gitlabTokenResponse
+	if err := json.Unmarshal(body, &tok); err != nil {
+		return "", err
+	}
+	if tok.AccessToken == "" {
+		return "", errors.New("gitlab token response missing access_token")
+	}
+	accessSealed, err := p.Box.Seal([]byte(tok.AccessToken))
+	if err != nil {
+		return "", err
+	}
+	refreshSealed, err := p.Box.Seal([]byte(tok.RefreshToken))
+	if err != nil {
+		return "", err
+	}
+	var expires pgtype.Timestamptz
+	if tok.ExpiresIn > 0 {
+		expires = pgtype.Timestamptz{Time: time.Now().Add(time.Duration(tok.ExpiresIn) * time.Second), Valid: true}
+	}
+	// Rotating refresh token: persist the NEW refresh_token (tok.RefreshToken),
+	// not the one we sent. UpdateGitLabConnectionTokens writes both atomically.
+	if err := p.Queries.UpdateGitLabConnectionTokens(ctx, db.UpdateGitLabConnectionTokensParams{
+		ID:                    conn.ID,
+		AccessTokenEncrypted:  accessSealed,
+		RefreshTokenEncrypted: refreshSealed,
+		TokenExpiresAt:        expires,
+	}); err != nil {
+		return "", fmt.Errorf("gitlab: persist refreshed tokens: %w", err)
+	}
+	return tok.AccessToken, nil
 }
 
 // doJSON performs one authenticated v4 REST call and decodes into out (nil out
