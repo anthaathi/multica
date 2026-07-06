@@ -64,7 +64,11 @@ type ExternalIssue struct {
 	Assignee    *ExternalUser
 	Author      *ExternalUser
 	WebURL      string
-	UpdatedAt   time.Time
+	// ParentExternalID is set when this issue is a subtask. It carries the
+	// provider-stable ID of the parent issue so the engine can link the
+	// local issue's parent_issue_id. Empty for top-level issues.
+	ParentExternalID string
+	UpdatedAt        time.Time
 }
 
 // ExternalComment is the provider-neutral shape of a remote comment. Body is

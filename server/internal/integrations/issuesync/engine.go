@@ -210,6 +210,17 @@ func (e *Engine) createLocalIssue(ctx context.Context, src db.IssueSyncSource, r
 		assigneeType = util.StrToText("member")
 		assigneeID = mappedUser
 	}
+	// Resolve subtask parent: if this issue has a parent on the remote side,
+	// find the corresponding local issue via the link table and link it.
+	var parentIssueID pgtype.UUID
+	if remote.ParentExternalID != "" {
+		if parentLink, err := e.Queries.GetExternalIssueLinkByExternalID(ctx, db.GetExternalIssueLinkByExternalIDParams{
+			SyncSourceID: src.ID,
+			ExternalID:   remote.ParentExternalID,
+		}); err == nil {
+			parentIssueID = parentLink.IssueID
+		}
+	}
 	res, err := e.IssueService.Create(ctx, service.IssueCreateParams{
 		WorkspaceID:  src.WorkspaceID,
 		Title:        remote.Title,
@@ -221,8 +232,8 @@ func (e *Engine) createLocalIssue(ctx context.Context, src db.IssueSyncSource, r
 		CreatorType:  "member",
 		CreatorID:    src.CreatedBy,
 		ProjectID:    src.ProjectID,
+		ParentIssueID: parentIssueID,
 		OriginType:   util.StrToText("issue_sync"),
-		OriginID:     src.ID,
 		// Backfill re-imports must not trip the duplicate guard on retry;
 		// idempotency comes from the link table, not the title.
 		AllowDuplicate: true,

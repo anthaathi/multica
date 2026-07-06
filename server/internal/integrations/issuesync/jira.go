@@ -309,7 +309,15 @@ type jiraIssueFields struct {
 	Reporter    *jiraUser       `json:"reporter"`
 	Creator     *jiraUser       `json:"creator"`
 	Project     *jiraProject    `json:"project"`
+	Parent      *jiraIssueRef   `json:"parent"`
 	Updated     string          `json:"updated"`
+}
+
+// jiraIssueRef is the minimal nested-issue reference Jira embeds for parent
+// links in subtask fields.
+type jiraIssueRef struct {
+	ID  string `json:"id"`
+	Key string `json:"key"`
 }
 
 type jiraIssue struct {
@@ -386,6 +394,9 @@ func JiraIssueToExternal(raw json.RawMessage) (ExternalIssue, bool) {
 		Assignee:    jiraUserToExternal(f.Assignee),
 		Author:      jiraUserToExternal(author),
 		UpdatedAt:   parseJiraTime(f.Updated),
+	}
+	if f.Parent != nil && f.Parent.ID != "" {
+		ext.ParentExternalID = f.Parent.ID
 	}
 	return ext, true
 }
