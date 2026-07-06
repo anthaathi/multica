@@ -3,14 +3,12 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, Trash2, ExternalLink, ChevronDown, RefreshCw } from "lucide-react";
+import { Plus, Trash2, ExternalLink, RefreshCw } from "lucide-react";
 import { api } from "@multica/core/api";
 import { Button } from "@multica/ui/components/ui/button";
-import { Card, CardContent } from "@multica/ui/components/ui/card";
 import { Switch } from "@multica/ui/components/ui/switch";
 import { Skeleton } from "@multica/ui/components/ui/skeleton";
 import { Label } from "@multica/ui/components/ui/label";
-import { Input } from "@multica/ui/components/ui/input";
 import { Badge } from "@multica/ui/components/ui/badge";
 import {
   Select,
@@ -64,17 +62,7 @@ import { JiraMark } from "../../settings/components/jira-mark";
 
 const PROVIDERS: SyncProvider[] = ["github", "gitlab", "jira"];
 
-// Local Multica statuses offered in the status-mapping editor. Kept in sync
-// with IssueStatus in packages/core/types/issue.ts.
-const LOCAL_STATUSES = [
-  "backlog",
-  "todo",
-  "in_progress",
-  "in_review",
-  "done",
-  "blocked",
-  "cancelled",
-] as const;
+
 
 function ProviderGlyph({ provider, className }: { provider: string; className?: string }) {
   switch (provider) {
@@ -164,7 +152,6 @@ function SyncSourceRow({
   const { t } = useT("projects");
   const updateMut = useUpdateSyncSource(wsId, projectId);
   const deleteMut = useDeleteSyncSource(wsId, projectId);
-  const [mappingOpen, setMappingOpen] = useState(false);
   const [removeTarget, setRemoveTarget] = useState(false);
 
   const backfill = source.backfill_status;
@@ -172,11 +159,11 @@ function SyncSourceRow({
     switch (backfill) {
       case "running":
         return t(($) => $.sync_sources.backfill_running);
-      case "completed":
+      case "done":
         return t(($) => $.sync_sources.backfill_completed);
       case "failed":
         return t(($) => $.sync_sources.backfill_failed);
-      case "idle":
+      case "pending":
         return t(($) => $.sync_sources.backfill_idle);
       default:
         return t(($) => $.sync_sources.backfill_unknown);
@@ -194,16 +181,6 @@ function SyncSourceRow({
     }
   }
 
-  async function handleTogglePushDefault(next: boolean) {
-    try {
-      await updateMut.mutateAsync({
-        sourceId: source.id,
-        data: { push_default: next },
-      });
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : t(($) => $.sync_sources.toast_update_failed));
-    }
-  }
 
   async function handleRemove() {
     try {
@@ -216,68 +193,28 @@ function SyncSourceRow({
   }
 
   return (
-    <Card>
-      <CardContent className="space-y-2 py-2">
-        <div className="flex items-center gap-2">
-          <ProviderGlyph provider={source.provider} className="h-4 w-4 shrink-0 text-muted-foreground" />
-          <span className="min-w-0 flex-1 truncate text-sm font-medium">
-            {source.external_key}
-          </span>
-          <Badge variant="secondary" className="shrink-0 text-[10px] font-normal">
-            {backfillLabel}
-          </Badge>
-        </div>
-
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-4">
-            <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Switch
-                checked={source.sync_enabled}
-                onCheckedChange={handleToggleEnabled}
-                disabled={updateMut.isPending}
-              />
-              {source.sync_enabled
-                ? t(($) => $.sync_sources.row_status_enabled)
-                : t(($) => $.sync_sources.row_status_disabled)}
-            </label>
-            <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Switch
-                checked={source.push_default}
-                onCheckedChange={handleTogglePushDefault}
-                disabled={updateMut.isPending}
-              />
-              {t(($) => $.sync_sources.push_default)}
-            </label>
-          </div>
-          <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 gap-1 text-xs text-muted-foreground"
-              onClick={() => setMappingOpen((v) => !v)}
-            >
-              <ChevronDown
-                className={`h-3 w-3 transition-transform ${mappingOpen ? "rotate-180" : ""}`}
-              />
-              {t(($) => $.sync_sources.status_mapping)}
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="text-muted-foreground hover:text-destructive"
-              title={t(($) => $.sync_sources.remove)}
-              onClick={() => setRemoveTarget(true)}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-        </div>
-
-        {mappingOpen && (
-          <StatusMappingEditor wsId={wsId} projectId={projectId} source={source} />
-        )}
-      </CardContent>
-
+    <div className="flex items-center gap-2 rounded-md border px-2.5 py-1.5">
+      <ProviderGlyph provider={source.provider} className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+      <span className="min-w-0 flex-1 truncate text-xs font-medium">
+        {source.external_key}
+      </span>
+      <Badge variant="secondary" className="shrink-0 px-1.5 py-0 text-[10px] font-normal">
+        {backfillLabel}
+      </Badge>
+      <Switch
+        checked={source.sync_enabled}
+        onCheckedChange={handleToggleEnabled}
+        disabled={updateMut.isPending}
+        className="scale-75"
+      />
+      <Button
+        variant="ghost"
+        size="sm"
+        className="h-6 shrink-0 px-1.5 text-xs text-muted-foreground"
+        onClick={() => setRemoveTarget(true)}
+      >
+        <Trash2 className="h-3 w-3" />
+      </Button>
       <AlertDialog open={removeTarget} onOpenChange={setRemoveTarget}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -298,111 +235,13 @@ function SyncSourceRow({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Card>
-  );
-}
 
-// Compact key-value editor for status_mapping (local Multica status → external
-// status). Edits are committed on every change via useUpdateSyncSource; the
-// mapping object is rebuilt from the current set of pairs before sending.
-function StatusMappingEditor({
-  wsId,
-  projectId,
-  source,
-}: {
-  wsId: string;
-  projectId: string;
-  source: IssueSyncSource;
-}) {
-  const { t } = useT("projects");
-  const updateMut = useUpdateSyncSource(wsId, projectId);
-
-  const pairs = useMemo(() => Object.entries(source.status_mapping), [source.status_mapping]);
-
-  function commit(next: Record<string, string>) {
-    updateMut.mutate(
-      { sourceId: source.id, data: { status_mapping: next } },
-      {
-        onError: (e) =>
-          toast.error(e instanceof Error ? e.message : t(($) => $.sync_sources.toast_update_failed)),
-      },
-    );
-  }
-
-  function updateKey(oldKey: string, newKey: string) {
-    const next: Record<string, string> = {};
-    for (const [k, v] of pairs) next[k === oldKey ? newKey : k] = v;
-    commit(next);
-  }
-  function updateValue(key: string, value: string) {
-    commit({ ...source.status_mapping, [key]: value });
-  }
-  function removeKey(key: string) {
-    const next = { ...source.status_mapping };
-    delete next[key];
-    commit(next);
-  }
-  function addMapping() {
-    const used = new Set(pairs.map(([k]) => k));
-    const candidate = LOCAL_STATUSES.find((s) => !used.has(s));
-    if (!candidate) return;
-    commit({ ...source.status_mapping, [candidate]: "" });
-  }
-
-  if (pairs.length === 0) {
-    return (
-      <div className="space-y-1 border-t pt-2">
-        <p className="text-xs text-muted-foreground">
-          {t(($) => $.sync_sources.status_mapping_empty)}
-        </p>
-        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={addMapping}>
-          <Plus className="h-3 w-3" />
-          {t(($) => $.sync_sources.status_mapping_add)}
-        </Button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-1.5 border-t pt-2">
-      {pairs.map(([local, external]) => (
-        <div key={local} className="flex items-center gap-1.5">
-          <Select value={local} onValueChange={(next) => next && updateKey(local, next)}>
-            <SelectTrigger size="sm" className="h-7 w-36 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {LOCAL_STATUSES.map((s) => (
-                <SelectItem key={s} value={s} className="text-xs">
-                  {t(($) => $.sync_sources[`status_${s}` as keyof typeof $.sync_sources] as string)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <span className="text-xs text-muted-foreground">→</span>
-          <Input
-            value={external}
-            onChange={(e) => updateValue(local, e.target.value)}
-            className="h-7 flex-1 text-xs"
-            placeholder={t(($) => $.sync_sources.status_mapping_external)}
-          />
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="h-7 text-muted-foreground hover:text-destructive"
-            onClick={() => removeKey(local)}
-          >
-            <Trash2 className="h-3 w-3" />
-          </Button>
-        </div>
-      ))}
-      <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={addMapping}>
-        <Plus className="h-3 w-3" />
-        {t(($) => $.sync_sources.status_mapping_add)}
-      </Button>
     </div>
   );
+
 }
+
+// StatusMappingEditor removed — compact row layout doesn't surface it yet.
 
 // Connection option normalized across providers so the picker render stays
 // provider-agnostic. id is the connection_id to send on create.
