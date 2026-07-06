@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -59,7 +60,7 @@ func (e *Engine) RunOutbox(ctx context.Context) {
 }
 
 func (e *Engine) dispatchOutbox(ctx context.Context, row db.IssueSyncOutbox) {
-	err := e.pushOne(ctx, row)
+	err := e.pushOneSafe(ctx, row)
 	if err == nil {
 		if cerr := e.Queries.CompleteIssueSyncOutbox(ctx, row.ID); cerr != nil {
 			slog.Warn("issuesync: outbox complete failed",
@@ -107,6 +108,22 @@ func (e *Engine) dispatchOutbox(ctx context.Context, row db.IssueSyncOutbox) {
 
 // errOutboxSkip signals "nothing to do" rather than a transport failure.
 var errOutboxSkip = errors.New("issuesync: outbox skip")
+
+// pushOneSafe converts a panic during a push into an ordinary error so the
+// row goes through retry/fail bookkeeping. A panic that escapes here kills
+// the server after the remote side effect was committed but before the link
+// row was recorded, so every restart re-creates the remote issue.
+func (e *Engine) pushOneSafe(ctx context.Context, row db.IssueSyncOutbox) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			slog.Error("issuesync: outbox push panicked",
+				"outbox_id", util.UUIDToString(row.ID), "op", row.Op,
+				"panic", r, "stack", string(debug.Stack()))
+			err = fmt.Errorf("outbox push panic: %v", r)
+		}
+	}()
+	return e.pushOne(ctx, row)
+}
 
 func (e *Engine) recordLinkError(ctx context.Context, row db.IssueSyncOutbox, pushErr error) {
 	link, err := e.Queries.GetExternalIssueLinkForIssue(ctx, db.GetExternalIssueLinkForIssueParams{

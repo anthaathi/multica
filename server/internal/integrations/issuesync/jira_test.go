@@ -97,6 +97,24 @@ func TestJiraIssueToExternalNullDescriptionAndDoneCategory(t *testing.T) {
 	}
 }
 
+// POST /issue returns {id, key, self} with no fields block. Conversion must
+// not panic on the missing status and must still yield the identity so the
+// link row can be recorded (otherwise the outbox retries the create and
+// duplicates the remote issue).
+func TestJiraIssueToExternalCreateResponseWithoutFields(t *testing.T) {
+	raw := json.RawMessage(`{"id":"10802","key":"SCRUM-257","self":"https://x.atlassian.net/rest/api/3/issue/10802"}`)
+	ext, ok := JiraIssueToExternal(raw)
+	if !ok {
+		t.Fatal("expected ok for a payload with an id")
+	}
+	if ext.ID != "10802" || ext.Key != "SCRUM-257" {
+		t.Errorf("identity = %q/%q, want 10802/SCRUM-257", ext.ID, ext.Key)
+	}
+	if ext.State != "" {
+		t.Errorf("State = %q, want empty when status is absent", ext.State)
+	}
+}
+
 func TestJiraIssueToExternalMissingID(t *testing.T) {
 	if _, ok := JiraIssueToExternal(json.RawMessage(`{"key":"X-1","fields":{}}`)); ok {
 		t.Fatal("expected ok=false for missing id")

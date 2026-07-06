@@ -384,12 +384,18 @@ func JiraIssueToExternal(raw json.RawMessage) (ExternalIssue, bool) {
 	if author == nil {
 		author = f.Creator
 	}
+	// Status is absent in minimal payloads such as the POST /issue create
+	// response ({id, key, self}); those still carry the identity we need.
+	state := ""
+	if f.Status != nil {
+		state = strings.ToLower(f.Status.StatusCategory.Key)
+	}
 	ext := ExternalIssue{
 		ID:          j.ID,
 		Key:         j.Key,
 		Title:       f.Summary,
 		Description: ADFToMarkdown(f.Description),
-		State:       strings.ToLower(f.Status.StatusCategory.Key),
+		State:       state,
 		Labels:      f.Labels,
 		Assignee:    jiraUserToExternal(f.Assignee),
 		Author:      jiraUserToExternal(author),
