@@ -2504,4 +2504,13 @@ export class ApiClient {
       { method: "DELETE" },
     );
   }
+
+  // Per-issue manual sync push — enqueues a create_remote or push_issue op.
+  async syncIssue(issueId: string, syncSourceId?: string): Promise<{ status: string; provider: string }> {
+    return this.fetch(`/api/issues/${issueId}/sync`, {
+      method: "POST",
+      body: JSON.stringify(syncSourceId ? { sync_source_id: syncSourceId } : {}),
+      headers: { "Content-Type": "application/json" },
+    });
+  }
 }

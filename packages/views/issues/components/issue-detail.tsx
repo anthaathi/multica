@@ -63,6 +63,7 @@ import { IssueAgentHeaderChip } from "./issue-agent-header-chip";
 import { ExecutionLogSection } from "./execution-log-section";
 import { PullRequestList } from "./pull-request-list";
 import { IssueSyncBadges } from "./issue-sync-badges";
+import { SyncIssueButton } from "./sync-issue-button";
 import { useGitHubSettings } from "@multica/core/github";
 import { useGitLabSettings } from "@multica/core/gitlab";
 import { useQuery } from "@tanstack/react-query";
@@ -1915,7 +1916,10 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
               if (trimmed && trimmed !== issue.title) handleUpdateField({ title: trimmed });
             }}
           />
-          <IssueSyncBadges />
+          <div className="mt-2 flex items-center gap-2">
+            <IssueSyncBadges />
+            <SyncIssueButton issueId={id} />
+          </div>
 
           {parentIssue && (
             <AppLink

@@ -481,5 +481,11 @@
   "sync_badges": {
     "label": "已同步",
     "open": "打开"
+  },
+  "sync": {
+    "sync_to_provider": "同步到提供商",
+    "syncing": "同步中…",
+    "push_queued": "已排队同步到 {{provider}}",
+    "push_failed": "同步失败：{{error}}"
   }
 }

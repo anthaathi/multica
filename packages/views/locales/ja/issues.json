@@ -481,5 +481,11 @@
   "sync_badges": {
     "label": "同期済み",
     "open": "開く"
+  },
+  "sync": {
+    "sync_to_provider": "プロバイダーへ同期",
+    "syncing": "同期中…",
+    "push_queued": "{{provider}} への同期をキューに追加しました",
+    "push_failed": "同期に失敗しました：{{error}}"
   }
 }

@@ -501,6 +501,91 @@ func (h *Handler) applyRemoteIssueWebhook(ctx context.Context, provider, externa
 	}
 }
 
+// SyncIssueToProvider (POST /api/issues/{id}/sync) manually pushes a single
+// issue to an external tracker. If sync_source_id is omitted, uses the issue's
+// project's push_default source, falling back to the first enabled source.
+// Creates the remote issue if no link exists, otherwise pushes an update.
+func (h *Handler) SyncIssueToProvider(w http.ResponseWriter, r *http.Request) {
+	if h.IssueSync == nil {
+		writeError(w, http.StatusServiceUnavailable, "issue sync is not configured")
+		return
+	}
+	issueID := chi.URLParam(r, "id")
+	issueUUID, ok := parseUUIDOrBadRequest(w, issueID, "issue id")
+	if !ok {
+		return
+	}
+	issue, err := h.Queries.GetIssue(r.Context(), issueUUID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "issue not found")
+		return
+	}
+	if !issue.ProjectID.Valid {
+		writeError(w, http.StatusBadRequest, "issue has no project — assign it to a project with a sync source first")
+		return
+	}
+	sources, err := h.Queries.ListIssueSyncSourcesByProject(r.Context(), issue.ProjectID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list sync sources")
+		return
+	}
+	var req struct {
+		SyncSourceID string `json:"sync_source_id"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&req) // body is optional
+
+	var target db.IssueSyncSource
+	if id := strings.TrimSpace(req.SyncSourceID); id != "" {
+		srcUUID, ok := parseUUIDOrBadRequest(w, id, "sync_source_id")
+		if !ok {
+			return
+		}
+		for _, s := range sources {
+			if s.ID == srcUUID {
+				target = s
+				break
+			}
+		}
+		if target.ID.Valid == false {
+			writeError(w, http.StatusNotFound, "sync source not found in this project")
+			return
+		}
+	} else {
+		// Default: push_default source, else first enabled source.
+		for _, s := range sources {
+			if s.SyncEnabled && s.PushDefault {
+				target = s
+				break
+			}
+		}
+		if target.ID.Valid == false {
+			for _, s := range sources {
+				if s.SyncEnabled {
+					target = s
+					break
+				}
+			}
+		}
+		if target.ID.Valid == false {
+			writeError(w, http.StatusBadRequest, "no enabled sync source on this project")
+			return
+		}
+	}
+
+	if err := h.IssueSync.SyncIssue(r.Context(), target, issue.ID); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to enqueue sync: "+err.Error())
+		return
+	}
+	h.publish(protocol.EventIssueUpdated, uuidToString(issue.WorkspaceID), "system", "", map[string]any{
+		"issue_id": issueID,
+	})
+	writeJSON(w, http.StatusAccepted, map[string]any{
+		"status":        "queued",
+		"sync_source_id": uuidToString(target.ID),
+		"provider":      target.Provider,
+	})
+}
+
 // ── GitHub webhook issue/comment handlers ───────────────────────────────────
 
 // ghIssueWebhookPayload is the shape GitHub delivers for `issues` and

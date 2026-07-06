@@ -595,9 +595,23 @@ func (e *Engine) RunBackfill(ctx context.Context, src db.IssueSyncSource) {
 			setState("failed", cursor)
 			return
 		}
+		// Two-pass apply: parents (no ParentExternalID) first so children can
+		// resolve their parent_issue_id on creation.
 		for _, remote := range issues {
+			if remote.ParentExternalID != "" {
+				continue
+			}
 			if err := e.ApplyRemote(ctx, src, IssueEvent{Kind: "issue", Issue: remote}); err != nil {
 				slog.Warn("issuesync: backfill apply failed",
+					"source_id", util.UUIDToString(src.ID), "external_id", remote.ID, "error", err)
+			}
+		}
+		for _, remote := range issues {
+			if remote.ParentExternalID == "" {
+				continue
+			}
+			if err := e.ApplyRemote(ctx, src, IssueEvent{Kind: "issue", Issue: remote}); err != nil {
+				slog.Warn("issuesync: backfill apply subtask failed",
 					"source_id", util.UUIDToString(src.ID), "external_id", remote.ID, "error", err)
 			}
 		}
@@ -608,4 +622,30 @@ func (e *Engine) RunBackfill(ctx context.Context, src db.IssueSyncSource) {
 		cursor = next
 		setState("running", cursor)
 	}
+}
+
+// SyncIssue enqueues an outbound push for a single issue against a specific
+// sync source. If the issue already has an external link, it pushes an update;
+// otherwise it creates the remote issue. This is the engine behind the
+// per-issue "Sync to provider" button.
+func (e *Engine) SyncIssue(ctx context.Context, src db.IssueSyncSource, issueID pgtype.UUID) error {
+	if !src.SyncEnabled {
+		return errors.New("issuesync: source is disabled")
+	}
+	provider := e.Provider(src.Provider)
+	if provider == nil {
+		return fmt.Errorf("issuesync: no provider for %q", src.Provider)
+	}
+	// Check if already linked → push update; otherwise create remote.
+	_, err := e.Queries.GetExternalIssueLinkForIssue(ctx, db.GetExternalIssueLinkForIssueParams{
+		IssueID:      issueID,
+		SyncSourceID: src.ID,
+	})
+	if err == nil {
+		return e.EnqueueOutbound(ctx, src, issueID, "push_issue", nil)
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return fmt.Errorf("issuesync: check link: %w", err)
+	}
+	return e.EnqueueOutbound(ctx, src, issueID, "create_remote", nil)
 }

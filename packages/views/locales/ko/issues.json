@@ -481,5 +481,11 @@
   "sync_badges": {
     "label": "동기화됨",
     "open": "열기"
+  },
+  "sync": {
+    "sync_to_provider": "제공자에 동기화",
+    "syncing": "동기화 중…",
+    "push_queued": "{{provider}} 동기화 대기열에 추가됨",
+    "push_failed": "동기화 실패: {{error}}"
   }
 }

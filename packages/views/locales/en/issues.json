@@ -501,5 +501,11 @@
   "sync_badges": {
     "label": "Synced",
     "open": "Open"
+  },
+  "sync": {
+    "sync_to_provider": "Sync to provider",
+    "syncing": "Syncing…",
+    "push_queued": "Queued sync to {{provider}}",
+    "push_failed": "Sync failed: {{error}}"
   }
 }

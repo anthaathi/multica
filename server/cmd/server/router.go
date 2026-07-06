@@ -1089,7 +1089,9 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					r.Get("/metadata", h.ListIssueMetadata)
 					r.Put("/metadata/{key}", h.SetIssueMetadataKey)
 					r.Delete("/metadata/{key}", h.DeleteIssueMetadataKey)
-					r.Get("/pull-requests", h.ListPullRequestsForIssue)
+				r.Get("/pull-requests", h.ListPullRequestsForIssue)
+				// Per-issue manual sync push to an external tracker.
+				r.Post("/sync", h.SyncIssueToProvider)
 				})
 			})
 
