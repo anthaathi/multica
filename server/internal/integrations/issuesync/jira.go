@@ -495,8 +495,12 @@ func (p *JiraProvider) ListIssues(ctx context.Context, src db.IssueSyncSource, c
 		return nil, "", err
 	}
 	issues := make([]ExternalIssue, 0, len(out.Issues))
+	browseBase := strings.TrimRight(conn.SiteUrl, "/") + "/browse/"
 	for _, raw := range out.Issues {
 		if ext, ok := JiraIssueToExternal(raw); ok {
+			if ext.WebURL == "" && ext.Key != "" {
+				ext.WebURL = browseBase + ext.Key
+			}
 			issues = append(issues, ext)
 		}
 	}

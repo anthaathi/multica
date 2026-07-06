@@ -1917,7 +1917,7 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
             }}
           />
           <div className="mt-2 flex items-center gap-2">
-            <IssueSyncBadges />
+            <IssueSyncBadges syncLinks={issue.sync_links} />
             <SyncIssueButton issueId={id} />
           </div>
 

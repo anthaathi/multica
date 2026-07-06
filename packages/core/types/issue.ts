@@ -1,4 +1,5 @@
 import type { Label } from "./label";
+import type { IssueSyncLink } from "./issue-sync";
 
 export type IssueStatus =
   | "backlog"
@@ -60,6 +61,7 @@ export interface Issue {
   metadata: IssueMetadata;
   reactions?: IssueReaction[];
   labels?: Label[];
+  sync_links?: IssueSyncLink[];
   created_at: string;
   updated_at: string;
 }

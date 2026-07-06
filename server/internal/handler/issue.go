@@ -66,6 +66,17 @@ type IssueResponse struct {
 	// preserves whatever labels are already in cache. nil pointer = "field
 	// absent, do not touch"; non-nil (incl. empty slice) = authoritative list.
 	Labels *[]LabelResponse `json:"labels,omitempty"`
+	// SyncLinks are the external tracker links (Jira/GitLab/GitHub) for this
+	// issue. Populated only by GetIssue; omitted in list/broadcast responses.
+	SyncLinks []IssueSyncLinkResponse `json:"sync_links,omitempty"`
+}
+
+// IssueSyncLinkResponse is the JSON shape for one external sync link on an issue.
+type IssueSyncLinkResponse struct {
+	Provider    string `json:"provider"`
+	ExternalKey string `json:"external_key"`
+	WebURL      string `json:"web_url"`
+	SyncError   *string `json:"sync_error,omitempty"`
 }
 
 // validIssueStatuses / validIssuePriorities mirror the CHECK constraints on
@@ -1659,6 +1670,31 @@ func (h *Handler) GetIssue(w http.ResponseWriter, r *http.Request) {
 		resp.Attachments = make([]AttachmentResponse, len(attachments))
 		for i, a := range attachments {
 			resp.Attachments[i] = h.attachmentToResponse(a)
+		}
+	}
+
+	// Fetch external sync links (Jira/GitLab/GitHub) so the detail page can
+	// show "View in Jira" badges with clickable URLs.
+	if links, lErr := h.Queries.ListExternalIssueLinksByIssue(r.Context(), issue.ID); lErr == nil && len(links) > 0 {
+		sourceCache := make(map[pgtype.UUID]string)
+		resp.SyncLinks = make([]IssueSyncLinkResponse, 0, len(links))
+		for _, l := range links {
+			provider := sourceCache[l.SyncSourceID]
+			if provider == "" {
+				if src, sErr := h.Queries.GetIssueSyncSource(r.Context(), l.SyncSourceID); sErr == nil {
+					provider = src.Provider
+					sourceCache[l.SyncSourceID] = provider
+				}
+			}
+			link := IssueSyncLinkResponse{
+				Provider:    provider,
+				ExternalKey: l.ExternalKey,
+				WebURL:      l.WebUrl,
+			}
+			if l.SyncError.Valid {
+				link.SyncError = textToPtr(l.SyncError)
+			}
+			resp.SyncLinks = append(resp.SyncLinks, link)
 		}
 	}
 
