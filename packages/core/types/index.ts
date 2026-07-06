@@ -100,6 +100,7 @@ export type {
   ProjectResourceType,
   ProjectResourceRef,
   GithubRepoResourceRef,
+  GitlabRepoResourceRef,
   LocalDirectoryResourceRef,
   CreateProjectResourceRequest,
   UpdateProjectResourceRequest,
@@ -121,6 +122,34 @@ export type {
   ListGitLabConnectionsResponse,
   GitLabConnectResponse,
 } from "./gitlab";
+export type {
+  SyncProvider,
+  BackfillStatus,
+  IssueSyncSource,
+  ListSyncSourcesResponse,
+  RemoteContainer,
+  ListRemoteContainersResponse,
+  JiraConnection,
+  ListJiraConnectionsResponse,
+  JiraConnectResponse,
+  CreateSyncSourceInput,
+  UpdateSyncSourceInput,
+  IssueSyncLink,
+} from "./issue-sync";
+export {
+  IssueSyncSourceSchema,
+  ListSyncSourcesResponseSchema,
+  RemoteContainerSchema,
+  ListRemoteContainersResponseSchema,
+  JiraConnectionSchema,
+  ListJiraConnectionsResponseSchema,
+  JiraConnectResponseSchema,
+  EMPTY_SYNC_SOURCE,
+  EMPTY_LIST_SYNC_SOURCES_RESPONSE,
+  EMPTY_LIST_REMOTE_CONTAINERS_RESPONSE,
+  EMPTY_LIST_JIRA_CONNECTIONS_RESPONSE,
+  EMPTY_JIRA_CONNECT_RESPONSE,
+} from "./issue-sync";
 export type {
   LarkInstallation,
   ListLarkInstallationsResponse,

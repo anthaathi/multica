@@ -66,6 +66,7 @@ const (
 	SourceChat       = "chat"
 	SourceAutopilot  = "autopilot"
 	SourceAPI        = "api"
+	SourceIssueSync  = "issue_sync"
 )
 
 // CoreProperties are the shared join and segmentation fields used by the

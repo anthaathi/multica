@@ -497,5 +497,9 @@
     "row_backlog_hint": "keeps the agent paused",
     "row_todo_label": "Todo",
     "row_todo_hint": "starts the agent"
+  },
+  "sync_badges": {
+    "label": "Synced",
+    "open": "Open"
   }
 }

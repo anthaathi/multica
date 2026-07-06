@@ -2,6 +2,16 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { ApiClient } from "./client";
 import { parseWithFallback } from "./schema";
+import {
+  ListSyncSourcesResponseSchema,
+  ListRemoteContainersResponseSchema,
+  ListJiraConnectionsResponseSchema,
+  JiraConnectResponseSchema,
+  EMPTY_LIST_SYNC_SOURCES_RESPONSE,
+  EMPTY_LIST_REMOTE_CONTAINERS_RESPONSE,
+  EMPTY_LIST_JIRA_CONNECTIONS_RESPONSE,
+  EMPTY_JIRA_CONNECT_RESPONSE,
+} from "../types/issue-sync";
 
 // Helper: stub fetch with a single JSON response. Status defaults to 200.
 function stubFetchJson(body: unknown, status = 200) {
@@ -398,6 +408,57 @@ describe("ApiClient schema fallback", () => {
       expect(resp.reused_skill_ids).toEqual([]);
     });
   });
+  // Issue-sync endpoints drive the project sync-source section and the Jira
+  // settings tab. A drifted contract must degrade to empty data, never throw.
+  describe("listSyncSources", () => {
+    it("falls back to an empty list when the response is malformed", async () => {
+      stubFetchJson({ sources: "not-an-array" });
+      const client = new ApiClient("https://api.example.test");
+      const res = await client.listSyncSources("p1");
+      expect(res).toEqual({ sources: [], total: 0 });
+    });
+
+    it("falls back when the response is an unrelated object", async () => {
+      stubFetchJson({ unrelated: true, ok: 1 });
+      const client = new ApiClient("https://api.example.test");
+      const res = await client.listSyncSources("p1");
+      expect(res.sources).toEqual([]);
+    });
+  });
+
+  describe("listRemoteContainers", () => {
+    it("falls back to empty containers when malformed", async () => {
+      stubFetchJson({ containers: null });
+      const client = new ApiClient("https://api.example.test");
+      const res = await client.listRemoteContainers("ws1", "github");
+      expect(res).toEqual({ containers: [], connection_id: "" });
+    });
+
+    it("falls back when fed a non-object payload", async () => {
+      stubFetchJson('"just a string"');
+      const client = new ApiClient("https://api.example.test");
+      const res = await client.listRemoteContainers("ws1", "jira", "c1");
+      expect(res.containers).toEqual([]);
+    });
+  });
+
+  describe("listJiraConnections", () => {
+    it("falls back to empty connections when malformed", async () => {
+      stubFetchJson({ connections: "oops", configured: "yes" });
+      const client = new ApiClient("https://api.example.test");
+      const res = await client.listJiraConnections("ws1");
+      expect(res).toEqual({ connections: [], configured: false, can_manage: false });
+    });
+  });
+
+  describe("getJiraConnectURL", () => {
+    it("falls back to not-configured when malformed", async () => {
+      stubFetchJson({ url: 12345 });
+      const client = new ApiClient("https://api.example.test");
+      const res = await client.getJiraConnectURL("ws1");
+      expect(res).toEqual({ url: "", configured: false });
+    });
+  });
 });
 
 // Direct tests for the helper, decoupled from any specific endpoint —
@@ -423,5 +484,93 @@ describe("parseWithFallback", () => {
     const fallback = { id: "fallback" };
     const out = parseWithFallback(null, schema, fallback, opts);
     expect(out).toBe(fallback);
+  });
+});
+// Issue-sync schemas fed truncated / garbage JSON must return the EMPTY_*
+// fallback constants rather than throw — installed desktop builds outlive any
+// given server, so a partial / null / wrong-type payload must degrade to the
+// safe empty shape. This mirrors the contract the project sync-source section
+// and the Jira settings tab rely on.
+describe("issue-sync schema fallbacks", () => {
+  const opts = { endpoint: "TEST /unit" };
+
+  it("ListSyncSourcesResponseSchema falls back on a truncated source object", () => {
+    const out = parseWithFallback(
+      { sources: [{ id: "x" }] },
+      ListSyncSourcesResponseSchema,
+      EMPTY_LIST_SYNC_SOURCES_RESPONSE,
+      opts,
+    );
+    expect(out).toBe(EMPTY_LIST_SYNC_SOURCES_RESPONSE);
+  });
+
+  it("ListSyncSourcesResponseSchema falls back on null / numbers / strings", () => {
+    for (const garbage of [null, 42, "nope", [1, 2], true]) {
+      const out = parseWithFallback(
+        garbage,
+        ListSyncSourcesResponseSchema,
+        EMPTY_LIST_SYNC_SOURCES_RESPONSE,
+        opts,
+      );
+      expect(out).toBe(EMPTY_LIST_SYNC_SOURCES_RESPONSE);
+    }
+  });
+
+  it("ListRemoteContainersResponseSchema falls back on garbage", () => {
+    const out = parseWithFallback(
+      { containers: [{ key: "only-key" }] },
+      ListRemoteContainersResponseSchema,
+      EMPTY_LIST_REMOTE_CONTAINERS_RESPONSE,
+      opts,
+    );
+    expect(out).toBe(EMPTY_LIST_REMOTE_CONTAINERS_RESPONSE);
+  });
+
+  it("ListJiraConnectionsResponseSchema falls back on garbage", () => {
+    const out = parseWithFallback(
+      undefined,
+      ListJiraConnectionsResponseSchema,
+      EMPTY_LIST_JIRA_CONNECTIONS_RESPONSE,
+      opts,
+    );
+    expect(out).toBe(EMPTY_LIST_JIRA_CONNECTIONS_RESPONSE);
+  });
+
+  it("JiraConnectResponseSchema falls back on a non-object payload", () => {
+    const out = parseWithFallback(
+      "redirect:please",
+      JiraConnectResponseSchema,
+      EMPTY_JIRA_CONNECT_RESPONSE,
+      opts,
+    );
+    expect(out).toBe(EMPTY_JIRA_CONNECT_RESPONSE);
+  });
+
+  it("parses a well-formed sync source through", () => {
+    const src = {
+      id: "s1",
+      project_id: "p1",
+      workspace_id: "w1",
+      provider: "jira",
+      connection_id: "c1",
+      external_ref: { key: "PROJ" },
+      external_key: "PROJ",
+      status_mapping: { open: "1" },
+      sync_enabled: true,
+      push_default: false,
+      backfill_status: "completed",
+      backfill_cursor: null,
+      created_at: "2026-01-01T00:00:00Z",
+      updated_at: "2026-01-02T00:00:00Z",
+    };
+    const out = parseWithFallback(
+      { sources: [src], total: 1 },
+      ListSyncSourcesResponseSchema,
+      EMPTY_LIST_SYNC_SOURCES_RESPONSE,
+      opts,
+    );
+    expect(out.sources).toHaveLength(1);
+    expect(out.sources[0]?.provider).toBe("jira");
+    expect(out.total).toBe(1);
   });
 });

@@ -74,6 +74,8 @@ func validateAndNormalizeResourceRef(resourceType string, ref json.RawMessage) (
 	switch resourceType {
 	case "github_repo":
 		return validateGithubRepoRef(ref)
+	case "gitlab_repo":
+		return validateGitlabRepoRef(ref)
 	case "local_directory":
 		return validateLocalDirectoryRef(ref)
 	default:
@@ -98,6 +100,31 @@ func validateGithubRepoRef(ref json.RawMessage) (json.RawMessage, error) {
 	}
 	if !isValidGitRepoURL(payload.URL) {
 		return nil, errors.New("github_repo: url must be a valid http(s) or ssh git URL")
+	}
+	payload.DefaultBranchHint = strings.TrimSpace(payload.DefaultBranchHint)
+	payload.Ref = strings.TrimSpace(payload.Ref)
+	out, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// gitlabRepoRef mirrors githubRepoRef: a gitlab_repo resource is a cloud-side
+// git checkout pointed at a GitLab (gitlab.com or self-hosted) repository.
+// The shape is { url, default_branch_hint?, ref? } and is validated the same
+// way — only the resource_type label differs.
+func validateGitlabRepoRef(ref json.RawMessage) (json.RawMessage, error) {
+	var payload githubRepoRef
+	if err := json.Unmarshal(ref, &payload); err != nil {
+		return nil, fmt.Errorf("invalid gitlab_repo payload: %w", err)
+	}
+	payload.URL = strings.TrimSpace(payload.URL)
+	if payload.URL == "" {
+		return nil, errors.New("gitlab_repo: url is required")
+	}
+	if !isValidGitRepoURL(payload.URL) {
+		return nil, errors.New("gitlab_repo: url must be a valid http(s) or ssh git URL")
 	}
 	payload.DefaultBranchHint = strings.TrimSpace(payload.DefaultBranchHint)
 	payload.Ref = strings.TrimSpace(payload.Ref)

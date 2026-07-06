@@ -11,6 +11,7 @@ import {
   Search,
   Trash2,
 } from "lucide-react";
+import { GitLabMark } from "../../settings/components/gitlab-mark";
 import { toast } from "sonner";
 import {
   projectResourcesOptions,
@@ -22,6 +23,7 @@ import { useWorkspaceId } from "@multica/core/hooks";
 import { useCurrentWorkspace } from "@multica/core/paths";
 import type {
   GithubRepoResourceRef,
+  GitlabRepoResourceRef,
   LocalDirectoryResourceRef,
   ProjectResource,
 } from "@multica/core/types";
@@ -55,6 +57,12 @@ function isGithubRef(r: ProjectResource): r is ProjectResource & {
   resource_ref: GithubRepoResourceRef;
 } {
   return r.resource_type === "github_repo";
+}
+
+function isGitlabRef(r: ProjectResource): r is ProjectResource & {
+  resource_ref: GitlabRepoResourceRef;
+} {
+  return r.resource_type === "gitlab_repo";
 }
 
 function isLocalDirectoryRef(r: ProjectResource): r is ProjectResource & {
@@ -110,10 +118,13 @@ export function ProjectResourcesSection({ projectId }: { projectId: string }) {
   const filteredRepos =
     workspace?.repos?.filter((repo) => repo.url.toLowerCase().includes(repoQuery)) ?? [];
 
-  const handleAttach = async (url: string) => {
+  const handleAttachRepo = async (
+    resourceType: "github_repo" | "gitlab_repo",
+    url: string,
+  ) => {
     try {
       await createResource.mutateAsync({
-        resource_type: "github_repo",
+        resource_type: resourceType,
         resource_ref: { url },
       });
       toast.success(t(($) => $.resources.toast_attached));
@@ -317,7 +328,7 @@ export function ProjectResourcesSection({ projectId }: { projectId: string }) {
                           aria-disabled={isDisabled}
                           onClick={async () => {
                             if (isDisabled) return;
-                            await handleAttach(repo.url);
+                            await handleAttachRepo("github_repo", repo.url);
                             setAddOpen(false);
                           }}
                           className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-left hover:bg-accent transition-colors aria-disabled:opacity-50 aria-disabled:cursor-not-allowed aria-disabled:hover:bg-transparent"
@@ -344,10 +355,22 @@ export function ProjectResourcesSection({ projectId }: { projectId: string }) {
               )}
               <CustomRepoForm
                 onSubmit={async (url) => {
-                  await handleAttach(url);
+                  await handleAttachRepo("github_repo", url);
                   setAddOpen(false);
                 }}
               />
+              <div className="pt-1 border-t">
+                <div className="flex items-center gap-1.5 py-1 text-[10px] font-medium text-muted-foreground">
+                  <GitLabMark className="size-3" />
+                  {t(($) => $.resources.gitlab_label)}
+                </div>
+                <CustomRepoForm
+                  onSubmit={async (url) => {
+                    await handleAttachRepo("gitlab_repo", url);
+                    setAddOpen(false);
+                  }}
+                />
+              </div>
             </PopoverContent>
           </Popover>
           {desktopMode && (
@@ -413,6 +436,40 @@ function ResourceRow({
     return (
       <div className="flex items-center gap-2 text-xs group">
         <FolderGit className="size-3.5 text-muted-foreground shrink-0" />
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <a
+                href={ref.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="truncate flex-1 hover:underline"
+              >
+                {display}
+              </a>
+            }
+          />
+          <TooltipContent side="top" className="whitespace-pre-line">{tooltip}</TooltipContent>
+        </Tooltip>
+        <button
+          type="button"
+          onClick={onRemove}
+          className="opacity-0 group-hover:opacity-100 transition-opacity rounded-sm p-0.5 hover:bg-accent"
+          title={t(($) => $.resources.remove_tooltip)}
+        >
+          <Trash2 className="size-3 text-muted-foreground" />
+        </button>
+      </div>
+    );
+  }
+
+  if (isGitlabRef(resource)) {
+    const ref = resource.resource_ref;
+    const display = resource.label || (ref.ref ? `${ref.url} @ ${ref.ref}` : ref.url);
+    const tooltip = ref.ref ? `${ref.url}\nref: ${ref.ref}` : ref.url;
+    return (
+      <div className="flex items-center gap-2 text-xs group">
+        <GitLabMark className="size-3.5 text-muted-foreground shrink-0" />
         <Tooltip>
           <TooltipTrigger
             render={

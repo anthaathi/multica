@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { GitHubMark } from "./github-mark";
 import { GitLabMark } from "./gitlab-mark";
+import { JiraMark } from "./jira-mark";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@multica/ui/components/ui/tabs";
 import { useCurrentWorkspace } from "@multica/core/paths";
 import { useNavigation } from "../../navigation";
@@ -25,6 +26,7 @@ import { MembersTab } from "./members-tab";
 import { RepositoriesTab } from "./repositories-tab";
 import { GitHubTab } from "./github-tab";
 import { GitLabTab } from "./gitlab-tab";
+import { JiraTab } from "./jira-tab";
 import { IntegrationsTab } from "./integrations-tab";
 import { LabsTab } from "./labs-tab";
 import { NotificationsTab } from "./notifications-tab";
@@ -37,12 +39,12 @@ const ACCOUNT_TAB_ICONS = {
   notifications: Bell,
   tokens: Key,
 } as const;
-
 const WORKSPACE_TAB_KEYS = [
   "general",
   "repositories",
   "github",
   "gitlab",
+  "jira",
   "integrations",
   "labs",
   "members",
@@ -52,6 +54,7 @@ const WORKSPACE_TAB_VALUES = {
   repositories: "repositories",
   github: "github",
   gitlab: "gitlab",
+  jira: "jira",
   integrations: "integrations",
   labs: "labs",
   members: "members",
@@ -61,6 +64,7 @@ const WORKSPACE_TAB_ICONS = {
   repositories: FolderGit2,
   github: GitHubMark,
   gitlab: GitLabMark,
+  jira: JiraMark,
   integrations: Plug,
   labs: FlaskConical,
   members: Users,
@@ -180,6 +184,7 @@ export function SettingsPage({ extraAccountTabs }: SettingsPageProps = {}) {
           <TabsContent value="repositories"><RepositoriesTab /></TabsContent>
           <TabsContent value="github"><GitHubTab /></TabsContent>
           <TabsContent value="gitlab"><GitLabTab /></TabsContent>
+          <TabsContent value="jira"><JiraTab /></TabsContent>
           <TabsContent value="integrations"><IntegrationsTab /></TabsContent>
           <TabsContent value="labs"><LabsTab /></TabsContent>
           <TabsContent value="members"><MembersTab /></TabsContent>

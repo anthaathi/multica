@@ -36,7 +36,8 @@
       "gitlab": "GitLab",
       "integrations": "Integrations",
       "labs": "Labs",
-      "members": "Members"
+      "members": "Members",
+      "jira": "Jira"
     }
   },
   "account": {
@@ -490,5 +491,28 @@
         "description": "Create and work on issues"
       }
     }
+  },
+  "jira": {
+    "page_description": "Connect a Jira account to sync issues bidirectionally with Multica projects.",
+    "section_connection": "Connection",
+    "connection_title": "Jira",
+    "connection_description": "Connect a Jira Cloud account so projects can attach Jira projects as sync sources.",
+    "connected_to": "Connected to {{site}} as {{email}}",
+    "connect_jira": "Connect Jira",
+    "connect_opening": "Opening…",
+    "connect_disabled_tooltip": "Jira is not configured on this server",
+    "disconnect": "Disconnect",
+    "disconnecting": "Disconnecting…",
+    "disconnect_confirm_title": "Disconnect Jira",
+    "disconnect_confirm_description": "Multica will stop syncing with this Jira connection. Sync sources using it are removed; existing linked issues are kept.",
+    "disconnect_confirm_cancel": "Cancel",
+    "disconnect_confirm_action": "Disconnect",
+    "not_configured": "Jira integration is not configured for this deployment. An operator must set the Jira secret key.",
+    "read_only_hint": "Read-only view. Only workspace admins and owners can connect or disconnect Jira.",
+    "contact_admin_to_connect": "Jira is not connected for this workspace. Ask an admin or owner to set it up.",
+    "toast_not_configured": "Jira integration is not configured for this deployment",
+    "toast_open_failed": "Failed to open Jira connect",
+    "toast_disconnect_failed": "Failed to disconnect Jira",
+    "toast_disconnected": "Jira disconnected"
   }
 }

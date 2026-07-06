@@ -477,5 +477,9 @@
     "row_backlog_hint": "智能体保持暂停",
     "row_todo_label": "Todo",
     "row_todo_hint": "启动智能体"
+  },
+  "sync_badges": {
+    "label": "已同步",
+    "open": "打开"
   }
 }

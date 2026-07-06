@@ -23,6 +23,7 @@ import (
 	"github.com/multica-ai/multica/server/internal/featureflagdispatch"
 	"github.com/multica-ai/multica/server/internal/integrations/channel/engine"
 	composio "github.com/multica-ai/multica/server/internal/integrations/composio"
+	"github.com/multica-ai/multica/server/internal/integrations/issuesync"
 	"github.com/multica-ai/multica/server/internal/integrations/lark"
 	"github.com/multica-ai/multica/server/internal/integrations/slack"
 	obsmetrics "github.com/multica-ai/multica/server/internal/metrics"
@@ -204,6 +205,17 @@ type Handler struct {
 	// plaintext token storage, mirroring Slack/Lark). Wired in
 	// cmd/server/router.go after handler.New.
 	GitLabBox *secretbox.Box
+	// IssueSync is the bidirectional issue-sync engine (GitHub/GitLab/Jira
+	// Issues <-> Multica issues). Nil in tests that don't exercise sync; the
+	// sync-source HTTP handlers and the GitHub/GitLab/Jira webhook issue
+	// paths no-op when it is unset. Wired in cmd/server/router.go after the
+	// engine is constructed and its providers registered.
+	IssueSync *issuesync.Engine
+	// JiraBox encrypts/decrypts the OAuth tokens + per-connection webhook
+	// secrets stored in jira_connection. Nil unless MULTICA_JIRA_SECRET_KEY
+	// is set; the Jira HTTP handlers then report "not configured", mirroring
+	// GitLab. Wired in cmd/server/router.go after handler.New.
+	JiraBox *secretbox.Box
 	cfg       Config
 }
 

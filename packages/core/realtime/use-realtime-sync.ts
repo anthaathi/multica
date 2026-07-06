@@ -25,6 +25,7 @@ import { githubKeys } from "../github/queries";
 import { gitlabKeys } from "../gitlab/queries";
 import { larkKeys } from "../lark/queries";
 import { slackKeys } from "../slack/queries";
+import { syncSourceKeys, jiraConnectionKeys } from "../issue-sync/queries";
 import {
   onIssueCreated,
   onIssueUpdated,
@@ -493,6 +494,18 @@ export function useRealtimeSync(
       gitlab_connection: () => {
         const wsId = getCurrentWsId();
         if (wsId) qc.invalidateQueries({ queryKey: gitlabKeys.connections(wsId) });
+      },
+      issue_sync_source: () => {
+        // issue_sync_source:created/updated/deleted — invalidate the wsId
+        // prefix so every project's sync-source list refetches. The event
+        // payload carries source_id/project_id but the prefix match is the
+        // simplest correct signal and matches how the list queries are keyed.
+        const wsId = getCurrentWsId();
+        if (wsId) qc.invalidateQueries({ queryKey: syncSourceKeys.all(wsId) });
+      },
+      jira_connection: () => {
+        const wsId = getCurrentWsId();
+        if (wsId) qc.invalidateQueries({ queryKey: jiraConnectionKeys.list(wsId) });
       },
       lark_installation: () => {
         const wsId = getCurrentWsId();

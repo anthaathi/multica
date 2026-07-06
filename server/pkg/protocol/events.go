@@ -132,6 +132,14 @@ const (
 	// GitLab-specific events.
 	EventGitLabConnectionCreated = "gitlab_connection:created"
 	EventGitLabConnectionDeleted = "gitlab_connection:deleted"
+	// Issue sync source lifecycle (bidirectional GitHub/GitLab/Jira sync).
+	// Front-ends invalidate the per-project sync-sources query on any of
+	// these; payloads carry only the source id + project id.
+	EventIssueSyncSourceCreated = "issue_sync_source:created"
+	EventIssueSyncSourceUpdated = "issue_sync_source:updated"
+	EventIssueSyncSourceDeleted = "issue_sync_source:deleted"
+	EventJiraConnectionCreated = "jira_connection:created"
+	EventJiraConnectionDeleted = "jira_connection:deleted"
 
 	// Lark integration events. `created` covers both first-install
 	// (UNIQUE on (workspace_id, agent_id) means at most one row per
