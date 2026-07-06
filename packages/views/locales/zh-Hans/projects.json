@@ -194,6 +194,9 @@
     "status_open": "待处理",
     "status_in_progress": "进行中",
     "status_done": "已完成",
-    "status_cancelled": "已取消"
+    "status_cancelled": "已取消",
+    "sync_all": "同步所有问题",
+    "sync_all_done": "已排队 {{count}} 个问题进行同步",
+    "sync_all_failed": "全部同步失败"
   }
 }

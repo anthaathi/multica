@@ -196,6 +196,9 @@
     "status_open": "Open",
     "status_in_progress": "In progress",
     "status_done": "Done",
-    "status_cancelled": "Cancelled"
+    "status_cancelled": "Cancelled",
+    "sync_all": "Sync all issues",
+    "sync_all_done": "Queued {{count}} issues for sync",
+    "sync_all_failed": "Sync all failed"
   }
 }

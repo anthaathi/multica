@@ -586,6 +586,64 @@ func (h *Handler) SyncIssueToProvider(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// SyncAllProjectIssues (POST /api/projects/{id}/sync-all) enqueues an outbound
+// push for every issue in the project to every enabled sync source. Issues
+// without a link get create_remote; linked issues get push_issue. This is the
+// bulk "Sync all" button behind the project sync-sources section.
+func (h *Handler) SyncAllProjectIssues(w http.ResponseWriter, r *http.Request) {
+	if h.IssueSync == nil {
+		writeError(w, http.StatusServiceUnavailable, "issue sync is not configured")
+		return
+	}
+	project, ok := h.loadProjectForResource(w, r, chi.URLParam(r, "id"))
+	if !ok {
+		return
+	}
+	sources, err := h.Queries.ListIssueSyncSourcesByProject(r.Context(), project.ID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list sync sources")
+		return
+	}
+	var enabled []db.IssueSyncSource
+	for _, s := range sources {
+		if s.SyncEnabled {
+			enabled = append(enabled, s)
+		}
+	}
+	if len(enabled) == 0 {
+		writeError(w, http.StatusBadRequest, "no enabled sync sources on this project")
+		return
+	}
+	issues, err := h.Queries.ListIssues(r.Context(), db.ListIssuesParams{
+		WorkspaceID: project.WorkspaceID,
+		ProjectID:   project.ID,
+		Limit:       10000,
+		Offset:      0,
+	})
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list project issues")
+		return
+	}
+	queued := 0
+	for _, issue := range issues {
+		for _, src := range enabled {
+			if err := h.IssueSync.SyncIssue(r.Context(), src, issue.ID); err != nil {
+				slog.Warn("issue_sync: sync-all enqueue failed",
+					"issue_id", util.UUIDToString(issue.ID), "error", err)
+				continue
+			}
+			queued++
+		}
+	}
+	h.publish(protocol.EventIssueSyncSourceUpdated, uuidToString(project.WorkspaceID), "system", "", map[string]any{
+		"project_id": uuidToString(project.ID),
+	})
+	writeJSON(w, http.StatusAccepted, map[string]any{
+		"status": "queued",
+		"count":  queued,
+	})
+}
+
 // ── GitHub webhook issue/comment handlers ───────────────────────────────────
 
 // ghIssueWebhookPayload is the shape GitHub delivers for `issues` and

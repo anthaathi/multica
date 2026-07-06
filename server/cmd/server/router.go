@@ -1127,6 +1127,8 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 				r.Post("/sync-sources", h.CreateSyncSource)
 				r.Put("/sync-sources/{sourceId}", h.UpdateSyncSource)
 				r.Delete("/sync-sources/{sourceId}", h.DeleteSyncSource)
+				// Bulk sync: push all project issues to their sync sources.
+				r.Post("/sync-all", h.SyncAllProjectIssues)
 				})
 			})
 

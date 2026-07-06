@@ -2513,4 +2513,9 @@ export class ApiClient {
       headers: { "Content-Type": "application/json" },
     });
   }
+
+  // Bulk sync: push all issues in a project to their sync sources.
+  async syncAllProjectIssues(projectId: string): Promise<{ status: string; count: number }> {
+    return this.fetch(`/api/projects/${projectId}/sync-all`, { method: "POST" });
+  }
 }

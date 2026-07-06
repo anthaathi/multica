@@ -112,9 +112,12 @@ func (p *GitLabProvider) defaultTokenForConn(ctx context.Context, connectionID s
 	if err != nil {
 		return "", "", fmt.Errorf("decrypt gitlab access token: %w", err)
 	}
-	baseURL := strings.TrimSpace(conn.GitlabBaseUrl)
+	// API base: prefer GITLAB_INTERNAL_URL (in-cluster split-horizon DNS) over
+	// the connection's public GitlabBaseUrl — the public hostname often does
+	// not resolve from inside the cluster. Mirrors handler.gitlabInternalURL.
+	baseURL := gitlabDefaultBaseURL()
 	if baseURL == "" {
-		baseURL = gitlabDefaultBaseURL()
+		baseURL = strings.TrimSpace(conn.GitlabBaseUrl)
 	}
 	return string(plain), baseURL, nil
 }

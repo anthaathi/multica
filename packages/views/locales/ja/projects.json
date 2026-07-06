@@ -194,6 +194,9 @@
     "status_open": "未対応",
     "status_in_progress": "対応中",
     "status_done": "完了",
-    "status_cancelled": "キャンセル済み"
+    "status_cancelled": "キャンセル済み",
+    "sync_all": "すべての課題を同期",
+    "sync_all_done": "{{count}} 件の課題を同期キューに追加しました",
+    "sync_all_failed": "一括同期に失敗しました"
   }
 }

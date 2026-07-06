@@ -194,6 +194,9 @@
     "status_open": "열림",
     "status_in_progress": "진행 중",
     "status_done": "완료",
-    "status_cancelled": "취소됨"
+    "status_cancelled": "취소됨",
+    "sync_all": "모든 이슈 동기화",
+    "sync_all_done": "{{count}}개 이슈 동기화 대기열에 추가됨",
+    "sync_all_failed": "전체 동기화 실패"
   }
 }

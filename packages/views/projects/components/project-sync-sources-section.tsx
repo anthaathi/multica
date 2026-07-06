@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, Trash2, ExternalLink, ChevronDown } from "lucide-react";
+import { Plus, Trash2, ExternalLink, ChevronDown, RefreshCw } from "lucide-react";
+import { api } from "@multica/core/api";
 import { Button } from "@multica/ui/components/ui/button";
 import { Card, CardContent } from "@multica/ui/components/ui/card";
 import { Switch } from "@multica/ui/components/ui/switch";
@@ -95,6 +96,18 @@ export function ProjectSyncSourcesSection({ projectId }: { projectId: string }) 
     syncSourcesOptions(wsId, projectId),
   );
   const [addOpen, setAddOpen] = useState(false);
+  const [syncingAll, setSyncingAll] = useState(false);
+  const handleSyncAll = async () => {
+    setSyncingAll(true);
+    try {
+      const res = await api.syncAllProjectIssues(projectId);
+      toast.success(t(($) => $.sync_sources.sync_all_done, { count: res.count }));
+    } catch {
+      toast.error(t(($) => $.sync_sources.sync_all_failed));
+    } finally {
+      setSyncingAll(false);
+    }
+  };
 
   return (
     <div>
@@ -105,9 +118,14 @@ export function ProjectSyncSourcesSection({ projectId }: { projectId: string }) 
         >
           {t(($) => $.sync_sources.section_title)}
         </button>
-        <Button variant="ghost" size="icon-sm" onClick={() => setAddOpen(true)} title={t(($) => $.sync_sources.add)}>
-          <Plus className="h-3.5 w-3.5" />
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon-sm" onClick={handleSyncAll} disabled={syncingAll || sources.length === 0} title={t(($) => $.sync_sources.sync_all)}>
+            <RefreshCw className={`h-3.5 w-3.5 ${syncingAll ? "animate-spin" : ""}`} />
+          </Button>
+          <Button variant="ghost" size="icon-sm" onClick={() => setAddOpen(true)} title={t(($) => $.sync_sources.add)}>
+            <Plus className="h-3.5 w-3.5" />
+          </Button>
+        </div>
       </div>
 
       <div className="mt-1 space-y-2">
