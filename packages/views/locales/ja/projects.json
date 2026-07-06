@@ -112,7 +112,8 @@
     "local_validate_not_a_directory": "パスはディレクトリではありません。",
     "local_validate_not_readable": "ディレクトリを読み取れません。",
     "local_validate_not_writable": "ディレクトリに書き込めません。",
-    "local_validate_unsupported": "ローカルディレクトリはデスクトップアプリでのみ選択できます。"
+    "local_validate_unsupported": "ローカルディレクトリはデスクトップアプリでのみ選択できます。",
+    "gitlab_label": "GitLab"
   },
   "delete_dialog": {
     "title": "プロジェクトを削除",

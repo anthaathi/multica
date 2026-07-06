@@ -113,7 +113,8 @@
     "local_validate_not_a_directory": "Path is not a directory.",
     "local_validate_not_readable": "Directory is not readable.",
     "local_validate_not_writable": "Directory is not writable.",
-    "local_validate_unsupported": "Local directories can only be picked on the desktop app."
+    "local_validate_unsupported": "Local directories can only be picked on the desktop app.",
+    "gitlab_label": "GitLab"
   },
   "delete_dialog": {
     "title": "Delete project",

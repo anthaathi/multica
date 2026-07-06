@@ -362,7 +362,7 @@ export function ProjectResourcesSection({ projectId }: { projectId: string }) {
               <div className="pt-1 border-t">
                 <div className="flex items-center gap-1.5 py-1 text-[10px] font-medium text-muted-foreground">
                   <GitLabMark className="size-3" />
-                  GitLab
+                  {t(($) => $.resources.gitlab_label)}
                 </div>
                 <CustomRepoForm
                   onSubmit={async (url) => {

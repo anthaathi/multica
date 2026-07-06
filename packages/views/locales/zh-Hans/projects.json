@@ -112,7 +112,8 @@
     "local_validate_not_a_directory": "该路径不是目录。",
     "local_validate_not_readable": "目录不可读。",
     "local_validate_not_writable": "目录不可写。",
-    "local_validate_unsupported": "本地目录仅能在桌面端选择。"
+    "local_validate_unsupported": "本地目录仅能在桌面端选择。",
+    "gitlab_label": "GitLab"
   },
   "delete_dialog": {
     "title": "删除项目",

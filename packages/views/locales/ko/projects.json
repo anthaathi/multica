@@ -112,7 +112,8 @@
     "local_validate_not_a_directory": "디렉터리가 아닙니다.",
     "local_validate_not_readable": "디렉터리를 읽을 수 없습니다.",
     "local_validate_not_writable": "디렉터리에 쓸 수 없습니다.",
-    "local_validate_unsupported": "로컬 디렉터리는 데스크톱 앱에서만 선택할 수 있습니다."
+    "local_validate_unsupported": "로컬 디렉터리는 데스크톱 앱에서만 선택할 수 있습니다.",
+    "gitlab_label": "GitLab"
   },
   "delete_dialog": {
     "title": "프로젝트 삭제",
