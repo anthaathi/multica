@@ -36,7 +36,7 @@ type taskContextMarkerFile struct {
 // Copilot:     skills → {workDir}/.github/skills/{name}/SKILL.md  (native project-level discovery)
 // OpenCode:    skills → {workDir}/.opencode/skills/{name}/SKILL.md  (native discovery)
 // OpenClaw:    skills → {workDir}/skills/{name}/SKILL.md  (native discovery — paired with a per-task synthesized openclaw-config.json that pins agents.defaults.workspace to workDir; see openclaw_config.go)
-// Pi:          skills → {workDir}/.pi/skills/{name}/SKILL.md  (native discovery)
+// Oh My Pi: skills → {workDir}/.omp/skills/{name}/SKILL.md  (native discovery — Pi fork relocating .pi → .omp; verified against omp 16.x)
 // Cursor:      skills → {workDir}/.cursor/skills/{name}/SKILL.md  (native discovery)
 // Kimi:        skills → {workDir}/.kimi/skills/{name}/SKILL.md  (native discovery)
 // Kiro:        skills → {workDir}/.kiro/skills/{name}/SKILL.md  (native discovery)
@@ -265,6 +265,11 @@ func skillsDirPath(workDir, provider string) string {
 	case "pi":
 		// Pi natively discovers skills from .pi/skills/ in the workdir.
 		return filepath.Join(workDir, ".pi", "skills")
+	case "omp":
+		// Oh My Pi (Pi fork) natively discovers project-level skills from
+		// .omp/skills/ in the workdir, relocating Pi's .pi/skills layout to
+		// .omp/skills. Verified against omp 16.x. https://omp.sh/
+		return filepath.Join(workDir, ".omp", "skills")
 	case "cursor":
 		// Cursor natively discovers skills from .cursor/skills/ in the workdir.
 		return filepath.Join(workDir, ".cursor", "skills")

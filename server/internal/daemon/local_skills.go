@@ -87,6 +87,7 @@ const (
 //   - OpenCode: https://opencode.ai/docs/skills
 //   - OpenClaw: https://github.com/openclaw/openclaw/blob/main/docs/tools/skills.md
 //   - Pi: https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/skills.md
+//   - Oh My Pi: ~/.omp/agent/skills (Pi fork; relocates ~/.pi/agent → ~/.omp/agent; https://omp.sh/)
 //   - Cursor: official forum guidance referencing the built-in /create-skill flow
 //     (https://forum.cursor.com/t/cursor-doesnt-know-new-skills-arens-saved/158507)
 //   - Hermes: ~/.hermes/skills is Hermes Agent's primary skill directory
@@ -128,6 +129,12 @@ func localSkillRootsForProvider(provider string) ([]localSkillRoot, bool, error)
 		providerRoot = filepath.Join(home, ".openclaw", "skills")
 	case "pi":
 		providerRoot = filepath.Join(home, ".pi", "agent", "skills")
+	case "omp":
+		// Oh My Pi (Pi fork) relocates Pi's ~/.pi/agent state to ~/.omp/agent;
+		// global skills live under the same agent/ subdirectory. Verified
+		// against omp 16.x (the ~/.omp/agent/ dir holds agent.db, sessions,
+		// skills). https://omp.sh/
+		providerRoot = filepath.Join(home, ".omp", "agent", "skills")
 	case "cursor":
 		providerRoot = filepath.Join(home, ".cursor", "skills")
 	case "hermes":
