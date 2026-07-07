@@ -109,13 +109,6 @@ vi.mock("@multica/core/auth", () => ({
     (selector ? selector({ user: { id: "user-1" } }) : { user: { id: "user-1" } }),
 }));
 
-vi.mock("@multica/core/runtimes", () => ({
-  runtimeListOptions: () => ({ queryKey: ["runtimes"] }),
-  checkQuickCreateCliVersion: () => ({ state: "ok", min: "1.0.0" }),
-  readRuntimeCliVersion: () => "1.2.3",
-  MIN_QUICK_CREATE_CLI_VERSION: "1.0.0",
-}));
-
 vi.mock("@multica/core/hooks/use-file-upload", () => ({
   useFileUpload: () => ({ uploadWithToast: mockUploadWithToast, uploading: false }),
 }));

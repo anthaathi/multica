@@ -23,7 +23,6 @@ import (
 	"github.com/multica-ai/multica/server/internal/middleware"
 	"github.com/multica-ai/multica/server/internal/service"
 	"github.com/multica-ai/multica/server/internal/util"
-	"github.com/multica-ai/multica/server/pkg/agent"
 	db "github.com/multica-ai/multica/server/pkg/db/generated"
 	"github.com/multica-ai/multica/server/pkg/protocol"
 )
@@ -1965,20 +1964,6 @@ func (h *Handler) QuickCreateIssue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Daemon CLI version gate. The agent-side prompt + create-flow rely on
-	// behaviors introduced in MinQuickCreateCLIVersion (URL attachment
-	// handling, quick-create attachment binding, no-retry on partial failure).
-	// Older daemons either double-create issues on partial CLI failures, drop
-	// attachment bindings, or mishandle pasted screenshot URLs; fail closed
-	// before enqueuing rather than surface the breakage as an inbox failure
-	// twenty seconds later. Dev-built
-	// daemons (git-describe shape) are exempted inside CheckMinCLIVersion
-	// so `make daemon` works without weakening staging or production.
-	if status, payload := h.checkQuickCreateDaemonVersion(r.Context(), agent.RuntimeID); status != 0 {
-		writeJSON(w, status, payload)
-		return
-	}
-
 	attachmentIDs, ok := parseUUIDSliceOrBadRequest(w, req.AttachmentIDs, "attachment_ids")
 	if !ok {
 		return
@@ -2056,54 +2041,6 @@ func (h *Handler) isRuntimeOnline(ctx context.Context, runtimeID pgtype.UUID) bo
 		return false
 	}
 	return rt.Status == "online"
-}
-
-// checkQuickCreateDaemonVersion enforces MinQuickCreateCLIVersion against the
-// CLI version the daemon reported at registration time (stored on the runtime
-// row's metadata.cli_version). Returns (0, nil) when the version is
-// acceptable, otherwise (status, payload) ready to hand to writeJSON.
-//
-// Failure shape is stable so the modal can branch on the `code` field and
-// surface a "needs upgrade" hint that points at the specific runtime:
-//
-//	422 {
-//	  "code": "daemon_version_unsupported",
-//	  "current_version": "0.2.18" | "",
-//	  "min_version":     "0.2.21",
-//	  "runtime_id":      "<uuid>"
-//	}
-func (h *Handler) checkQuickCreateDaemonVersion(ctx context.Context, runtimeID pgtype.UUID) (int, map[string]any) {
-	rt, err := h.Queries.GetAgentRuntime(ctx, runtimeID)
-	if err != nil {
-		// Runtime row vanished between the online check and here — treat
-		// as unavailable rather than wedging the request on a 500.
-		return http.StatusUnprocessableEntity, map[string]any{
-			"code":   "agent_unavailable",
-			"reason": "agent's runtime is no longer registered",
-		}
-	}
-	current := readRuntimeCLIVersion(rt.Metadata)
-	switch err := agent.CheckMinCLIVersion(current); {
-	case err == nil:
-		return 0, nil
-	case errors.Is(err, agent.ErrCLIVersionMissing), errors.Is(err, agent.ErrCLIVersionTooOld):
-		return http.StatusUnprocessableEntity, map[string]any{
-			"code":            "daemon_version_unsupported",
-			"current_version": current,
-			"min_version":     agent.MinQuickCreateCLIVersion,
-			"runtime_id":      uuidToString(runtimeID),
-		}
-	default:
-		// Defensive fall-through: unknown error from the version check is
-		// also fail-closed, since the gate exists precisely because we
-		// can't trust older daemons with this flow.
-		return http.StatusUnprocessableEntity, map[string]any{
-			"code":            "daemon_version_unsupported",
-			"current_version": current,
-			"min_version":     agent.MinQuickCreateCLIVersion,
-			"runtime_id":      uuidToString(runtimeID),
-		}
-	}
 }
 
 // readRuntimeCLIVersion pulls metadata.cli_version off a runtime row. The
