@@ -31,9 +31,9 @@ multica daemon restart
 
 Or, in the desktop app, just relaunch the app. The daemon re-scans `PATH` on every start.
 
-## The 14 supported tools
+## The 15 supported tools
 
-Listed roughly from most to least common. Pick whichever ones you already have credentials for — you don't need all 14.
+Listed roughly from most to least common. Pick whichever ones you already have credentials for — you don't need all 15.
 
 ### Claude Code (Anthropic)
 
@@ -136,6 +136,17 @@ Minimalist. **Session resumption is unusual** — the resume id is the path to a
 | Daemon looks for | `pi` |
 | Install | See Inflection's CLI docs at [pi.ai](https://pi.ai/). |
 | Authentication | Per the vendor's docs. |
+
+### Oh My Pi (can1357)
+
+[Oh My Pi](https://omp.sh/) (`omp`, [github.com/can1357/oh-my-pi](https://github.com/can1357/oh-my-pi)) is a community fork of Pi that keeps Pi's JSON event protocol. **Session resumption works** with a normal string id (omp emits a leading session header; Multica passes the id back with `--resume`). MCP is not consumed initially (configure MCP in omp's own settings). Model selection is dynamic (`omp models --json`), and thinking level is honoured via omp's native `--thinking` flag. Skills live in `.omp/skills/` (project) and `~/.omp/agent/skills` (global).
+
+| | |
+|---|---|
+| Daemon looks for | `omp` |
+| Install | `brew install can1357/tap/omp`, or `bun install -g @oh-my-pi/pi-coding-agent` (requires bun ≥ 1.3.14). See [omp.sh](https://omp.sh/). |
+| Authentication | Configure model provider(s) per omp's docs (Anthropic, OpenAI, Gemini, etc.) — set the relevant `*_API_KEY`, or run `omp token <provider>` for OAuth. |
+| Notes | Set a daemon-wide default model with `MULTICA_OMP_MODEL` (a `provider/id` selector from `omp models --json`). |
 
 ### CodeBuddy (Tencent)
 
