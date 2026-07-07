@@ -135,17 +135,22 @@ function PiLogo({ className }: { className: string }) {
   );
 }
 
-// Oh My Pi (omp.sh) — monogram placeholder pending official artwork. omp is a
-// Pi fork, so to stay distinct from the Pi pixel wordmark above we use a
-// violet rounded tile + white "O" ring (orbit motif, fitting "Oh My"). The
-// official branding lives at https://omp.sh/ — swap this for the real mark
-// when a clean SVG is available.
+// Oh My Pi (omp.sh) — official mark (the gradient "π" glyph from omp.sh),
+// recolored via an OKLCH diagonal gradient (purple → indigo → cyan). The
+// gradient id is per-instance (useId) so multiple logos on one page don't
+// collide on a shared id, mirroring the CodeBuddy clipPath pattern.
 function OmpLogo({ className }: { className: string }) {
+  const gradId = `omp-mark-grad-${useId().replace(/:/g, "")}`;
   return (
-    <svg viewBox="0 0 24 24" fill="none" className={className}>
-      <rect width="24" height="24" rx="5" fill="#7c3aed" />
-      <circle cx="12" cy="12" r="5.5" stroke="#fff" strokeWidth="2.2" />
-      <circle cx="12" cy="12" r="1.7" fill="#fff" />
+    <svg viewBox="0 0 64 64" fill="none" className={className} aria-hidden="true">
+      <defs>
+        <linearGradient id={gradId} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="oklch(0.7 0.24 340)" />
+          <stop offset=".5" stopColor="oklch(0.62 0.21 295)" />
+          <stop offset="1" stopColor="oklch(0.81 0.14 200)" />
+        </linearGradient>
+      </defs>
+      <path fill={`url(#${gradId})`} d="M10 14h44v9H43v33h-9V23h-9v22h-9V23H10z" />
     </svg>
   );
 }
