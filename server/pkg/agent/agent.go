@@ -1,7 +1,7 @@
 // Package agent provides a unified interface for executing prompts via
 // coding agents (Claude Code, CodeBuddy, Codex, Copilot, OpenCode, OpenClaw,
-// Hermes, Pi, Cursor, Kimi, Kiro, Antigravity, Qoder). It mirrors the
-// happy-cli AgentBackend pattern, translated to idiomatic Go.
+// Hermes, Pi, Cursor, Kimi, Kiro, Antigravity, Qoder, Trae, Oh My Pi). It
+// mirrors the happy-cli AgentBackend pattern, translated to idiomatic Go.
 package agent
 
 import (
@@ -127,24 +127,27 @@ type Result struct {
 
 // Config configures a Backend instance.
 type Config struct {
-	ExecutablePath string            // path to CLI binary (claude, codebuddy, codex, copilot, opencode, openclaw, hermes, pi, cursor, kimi, kiro-cli, agy, qodercli)
+	ExecutablePath string            // path to CLI binary (claude, codebuddy, codex, copilot, opencode, openclaw, hermes, pi, cursor, kimi, kiro-cli, agy, qodercli, traecli, omp)
 	Env            map[string]string // extra environment variables
 	Logger         *slog.Logger
 }
 
 // New creates a Backend for the given agent type.
-// Supported types: "claude", "codebuddy", "codex", "copilot", "opencode", "openclaw", "hermes", "pi", "cursor", "kimi", "kiro", "antigravity", "qoder", "traecli".
+// Supported types: "claude", "codebuddy", "codex", "copilot", "opencode", "openclaw", "hermes", "pi", "cursor", "kimi", "kiro", "antigravity", "qoder", "traecli", "omp".
 //
 // SupportedTypes is the canonical whitelist of agent types eligible to back a
 // custom runtime profile. It MUST stay in lockstep with the
 // runtime_profile.protocol_family CHECK constraint (migration 120, widened by
-// migration 134 to add qoder and migration 136 to add traecli): a custom
-// runtime profile may only be based on a backend Multica officially supports.
+// migration 134 to add qoder, migration 136 to add traecli, and migration 137
+// to add omp): a custom runtime profile may only be based on a backend
+// Multica officially supports.
 // qoder is exposed here so Qoder CN (`qoderclicn`) users can point the Qoder
 // backend at a non-default binary instead of misrouting through Kiro/ACP with
 // incompatible arguments (#4883). traecli (Trae) has a New backend, launch
 // header and provider branding but was previously missing from this whitelist,
-// so the family picker rejected it (#4945).
+// so the family picker rejected it (#4945). omp (Oh My Pi) is a Pi fork that
+// keeps Pi's JSON event protocol but diverges on session identity, resume, and
+// thinking flags, so it has a dedicated backend rather than reusing pi's.
 var SupportedTypes = []string{
 	"claude",
 	"codebuddy",
@@ -160,6 +163,7 @@ var SupportedTypes = []string{
 	"antigravity",
 	"qoder",
 	"traecli",
+	"omp",
 }
 
 // IsSupportedType reports whether agentType is in the SupportedTypes whitelist.
@@ -208,8 +212,10 @@ func New(agentType string, cfg Config) (Backend, error) {
 		return &qoderBackend{cfg: cfg}, nil
 	case "traecli":
 		return &traecliBackend{cfg: cfg}, nil
+	case "omp":
+		return &ompBackend{cfg: cfg}, nil
 	default:
-		return nil, fmt.Errorf("unknown agent type: %q (supported: claude, codebuddy, codex, copilot, opencode, openclaw, hermes, pi, cursor, kimi, kiro, antigravity, qoder, traecli)", agentType)
+		return nil, fmt.Errorf("unknown agent type: %q (supported: claude, codebuddy, codex, copilot, opencode, openclaw, hermes, pi, cursor, kimi, kiro, antigravity, qoder, traecli, omp)", agentType)
 	}
 }
 
@@ -237,6 +243,7 @@ var launchHeaders = map[string]string{
 	"openclaw":    "openclaw agent (json)",
 	"opencode":    "opencode run (json)",
 	"pi":          "pi (json mode)",
+	"omp":         "omp (json mode)",
 	"qoder":       "qodercli --acp",
 	"traecli":     "traecli acp serve",
 }

@@ -393,12 +393,17 @@ func (b *piBackend) Execute(ctx context.Context, prompt string, opts ExecOptions
 
 // ── Pi event types ──
 
-// piStreamEvent is the union of fields we consume from Pi's JSON event
-// stream. Fields that can be either string or object across event types
-// (e.g. `message`, `result`) are held as json.RawMessage and decoded on
-// demand by the switch arms.
+// piStreamEvent is the union of fields we consume from Pi's and omp's JSON
+// event streams. Fields that can be either string or object across event
+// types (e.g. `message`, `result`) are held as json.RawMessage and decoded on
+// demand by the switch arms. The ID field is only emitted by omp's leading
+// {"type":"session","id":...} session header; Pi never sends it, so it stays
+// empty for the Pi backend.
 type piStreamEvent struct {
 	Type string `json:"type"`
+
+	// session header (omp only): the opaque session id / resume token.
+	ID string `json:"id,omitempty"`
 
 	// message_update
 	AssistantMessageEvent *piAssistantMessageEvent `json:"assistantMessageEvent,omitempty"`

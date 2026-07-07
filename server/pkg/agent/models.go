@@ -147,6 +147,13 @@ func ListModels(ctx context.Context, providerType, executablePath string) ([]Mod
 		return cachedDiscovery(providerType, func() ([]Model, error) {
 			return discoverPiModels(ctx, executablePath)
 		})
+	case "omp":
+		// Oh My Pi exposes its catalog via `omp models --json` (a subcommand,
+		// not Pi's --list-models flag). Enumerate it on demand; on any failure
+		// (binary missing, not configured) the UI falls back to manual entry.
+		return cachedDiscovery(providerType, func() ([]Model, error) {
+			return discoverOmpModels(ctx, executablePath)
+		})
 	case "openclaw":
 		return cachedDiscovery(providerType, func() ([]Model, error) {
 			return discoverOpenclawAgents(ctx, executablePath)
@@ -658,6 +665,96 @@ func discoverPiModels(ctx context.Context, executablePath string) ([]Model, erro
 		text = stderr.String()
 	}
 	return parsePiModels(text), nil
+}
+
+// discoverOmpModels runs `omp models --json` and parses its output. omp (a
+// Pi fork) exposes its catalog via a `models` subcommand with a `--json` flag
+// (Pi's `--list-models` flag does not exist in omp). The JSON shape is
+// `{"models":[{provider,id,selector,name,thinking,...}]}` where `selector`
+// is already the `provider/id` form our splitPiModel helper expects, so model
+// IDs round-trip verbatim into `--model`/`--provider` on the next run.
+//
+// omp fetches its catalog from each configured provider over the network, so
+// discovery time scales with provider count — we allow 15s like Pi/opencode.
+// On any failure (binary missing, not configured, timeout, parse error) we
+// return an empty list so the UI falls back to the manual-entry field.
+func discoverOmpModels(ctx context.Context, executablePath string) ([]Model, error) {
+	if executablePath == "" {
+		executablePath = "omp"
+	}
+	if _, err := exec.LookPath(executablePath); err != nil {
+		return []Model{}, nil
+	}
+	runCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(runCtx, executablePath, "models", "--json")
+	hideAgentWindow(cmd)
+	stdout, err := cmd.Output()
+	if err != nil {
+		return []Model{}, nil
+	}
+	return parseOmpModelsJSON(stdout), nil
+}
+
+// ompModelsPayload mirrors `omp models --json` output.
+type ompModelsPayload struct {
+	Models []ompModelEntry `json:"models"`
+}
+
+// ompModelEntry is one entry in the omp models catalog. `selector` is the
+// canonical `provider/id` string; `thinking` lists the reasoning-effort
+// tokens the model accepts (surfaced as the thinking-level picker).
+type ompModelEntry struct {
+	Provider string   `json:"provider"`
+	ID       string   `json:"id"`
+	Selector string   `json:"selector"`
+	Name     string   `json:"name"`
+	Thinking []string `json:"thinking"`
+}
+
+// parseOmpModelsJSON turns `omp models --json` output into Model entries.
+// The ID uses the `selector` field (`provider/id`) so it is compatible with
+// splitPiModel and round-trips into `--model`/`--provider` unchanged. When a
+// model advertises a non-empty `thinking` list, each token becomes a
+// ThinkingLevel the backend later passes through `--thinking`. Malformed JSON
+// yields an empty list (never an error) so a bad catalog doesn't block the UI.
+func parseOmpModelsJSON(raw []byte) []Model {
+	var payload ompModelsPayload
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return []Model{}
+	}
+	models := make([]Model, 0, len(payload.Models))
+	for _, m := range payload.Models {
+		id := m.Selector
+		if id == "" {
+			// Fall back to provider/id if selector is absent.
+			if m.Provider != "" && m.ID != "" {
+				id = m.Provider + "/" + m.ID
+			} else {
+				id = m.ID
+			}
+		}
+		if id == "" {
+			continue
+		}
+		model := Model{
+			ID:       id,
+			Provider: m.Provider,
+			Label:    m.Name,
+		}
+		if len(m.Thinking) > 0 {
+			levels := make([]ThinkingLevel, 0, len(m.Thinking))
+			for _, value := range m.Thinking {
+				levels = append(levels, ThinkingLevel{
+					Value: value,
+					Label: strings.Title(strings.ReplaceAll(value, "-", " ")), //nolint:staticcheck
+				})
+			}
+			model.Thinking = &ModelThinking{SupportedLevels: levels}
+		}
+		models = append(models, model)
+	}
+	return models
 }
 
 // parsePiModels accepts the `pi --list-models` output. Pi historically
