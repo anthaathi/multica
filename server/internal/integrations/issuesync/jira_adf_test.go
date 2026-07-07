@@ -85,6 +85,47 @@ func TestADFNumberedListRoundTrip(t *testing.T) {
 	}
 }
 
+// TestMarkdownToADFOrderedListSchemaValid guards against emitting a node type
+// that is not in the ADF schema. A prior version wrote "numberedList", which
+// round-trips with this code's own reader but is rejected by Jira's REST API
+// with 400 "not valid Atlassian Document Format content" — breaking every
+// outbound create/update whose description contained a numbered list. The only
+// schema-valid ordered-list type is "orderedList".
+func TestMarkdownToADFOrderedListSchemaValid(t *testing.T) {
+	adf := MarkdownToADF("1. a\n2. b")
+	var doc struct {
+		Content []map[string]any `json:"content"`
+	}
+	if err := json.Unmarshal(adf, &doc); err != nil {
+		t.Fatalf("invalid ADF JSON: %v", err)
+	}
+	if len(doc.Content) != 1 {
+		t.Fatalf("expected 1 block, got %d", len(doc.Content))
+	}
+	if got := doc.Content[0]["type"]; got != "orderedList" {
+		t.Fatalf("ordered-list node type = %v, want orderedList (the only schema-valid type)", got)
+	}
+}
+
+// TestADFToMarkdownOrderedList verifies the inbound direction against a real
+// Jira ADF payload (which uses "orderedList"), independent of the writer.
+func TestADFToMarkdownOrderedList(t *testing.T) {
+	adf := json.RawMessage(`{
+		"type": "doc",
+		"version": 1,
+		"content": [
+			{"type": "orderedList", "content": [
+				{"type": "listItem", "content": [{"type": "paragraph", "content": [{"type": "text", "text": "one"}]}]},
+				{"type": "listItem", "content": [{"type": "paragraph", "content": [{"type": "text", "text": "two"}]}]}
+			]}
+		]
+	}`)
+	want := "1. one\n2. two"
+	if got := ADFToMarkdown(adf); got != want {
+		t.Fatalf("ADFToMarkdown orderedList = %q, want %q", got, want)
+	}
+}
+
 func TestADFCodeBlockRoundTrip(t *testing.T) {
 	md := "```\nfunc main() {}\nprint('hi')\n```"
 	if got := roundTrip(t, md); got != md {

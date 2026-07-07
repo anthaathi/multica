@@ -31,7 +31,7 @@ type adfMark struct {
 
 // ADFToMarkdown converts an ADF document to markdown. nil/null/empty input
 // returns "". Supports the common block types (paragraph, heading, bulletList,
-// numberedList, codeBlock, blockquote) and inline marks (strong/em/code/strike/
+// orderedList, codeBlock, blockquote) and inline marks (strong/em/code/strike/
 // link), mentions, and inlineCards. Unknown nodes contribute their text content
 // when present.
 func ADFToMarkdown(adf json.RawMessage) string {
@@ -85,7 +85,7 @@ func renderADFBlock(n adfNode) string {
 		return strings.Repeat("#", adfHeadingLevel(n.Attrs)) + " " + renderADFInline(n.Content)
 	case "bulletList":
 		return renderADFList(n.Content, "- ")
-	case "numberedList":
+	case "orderedList":
 		return renderADFList(n.Content, "%d. ")
 	case "codeBlock":
 		return "```\n" + renderADFInline(n.Content) + "\n```"
@@ -126,7 +126,7 @@ func renderADFList(items []adfNode, marker string) string {
 				text.WriteString(renderADFInline(c.Content))
 			case "bulletList":
 				nested = append(nested, renderADFList(c.Content, "- "))
-			case "numberedList":
+			case "orderedList":
 				nested = append(nested, renderADFList(c.Content, "%d. "))
 			default:
 				if s := renderADFBlock(c); s != "" {
@@ -289,7 +289,7 @@ func MarkdownToADF(md string) json.RawMessage {
 				items = append(items, cur)
 				i++
 			}
-			content = append(content, adfList("numberedList", items))
+			content = append(content, adfList("orderedList", items))
 			continue
 		}
 		if strings.HasPrefix(line, ">") {
