@@ -281,6 +281,7 @@ type ProviderName =
   | "kiro"
   | "qoder"
   | "pi"
+  | "omp"
   | "copilot"
   | "cursor";
 

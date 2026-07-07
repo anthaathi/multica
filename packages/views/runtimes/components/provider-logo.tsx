@@ -135,6 +135,21 @@ function PiLogo({ className }: { className: string }) {
   );
 }
 
+// Oh My Pi (omp.sh) — monogram placeholder pending official artwork. omp is a
+// Pi fork, so to stay distinct from the Pi pixel wordmark above we use a
+// violet rounded tile + white "O" ring (orbit motif, fitting "Oh My"). The
+// official branding lives at https://omp.sh/ — swap this for the real mark
+// when a clean SVG is available.
+function OmpLogo({ className }: { className: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className}>
+      <rect width="24" height="24" rx="5" fill="#7c3aed" />
+      <circle cx="12" cy="12" r="5.5" stroke="#fff" strokeWidth="2.2" />
+      <circle cx="12" cy="12" r="1.7" fill="#fff" />
+    </svg>
+  );
+}
+
 // GitHub Copilot — GitHub mark (Invertocat)
 function CopilotLogo({ className }: { className: string }) {
   return (
@@ -280,6 +295,8 @@ export function ProviderLogo({
       return <HermesLogo className={className} />;
     case "pi":
       return <PiLogo className={className} />;
+    case "omp":
+      return <OmpLogo className={className} />;
     case "copilot":
       return <CopilotLogo className={className} />;
     case "cursor":
