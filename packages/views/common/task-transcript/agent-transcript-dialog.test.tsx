@@ -111,22 +111,16 @@ vi.mock("@multica/ui/components/ui/collapsible", async () => {
   };
 });
 
-// Virtuoso renders asynchronously in jsdom (no measured viewport), making sync
-// getByText flaky. Render every item synchronously instead.
-vi.mock("react-virtuoso", () => ({
-  Virtuoso: ({
-    data,
-    itemContent,
-  }: {
-    data: unknown[];
-    itemContent: (index: number, item: unknown) => ReactNode;
-  }) => (
-    <div data-testid="virtuoso">
-      {data.map((item, i) => (
-        <div key={i}>{itemContent(i, item)}</div>
-      ))}
-    </div>
+// MessageScroller relies on real scroll/layout jsdom can't measure. Render
+// the conversation synchronously through passthrough primitives instead.
+vi.mock("@multica/ui/components/ui/message-scroller", () => ({
+  MessageScrollerProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
+  MessageScroller: ({ children }: { children: ReactNode }) => <>{children}</>,
+  MessageScrollerViewport: ({ children }: { children: ReactNode }) => <>{children}</>,
+  MessageScrollerContent: ({ children }: { children: ReactNode }) => (
+    <div data-testid="conv-list">{children}</div>
   ),
+  MessageScrollerButton: () => null,
 }));
 
 const baseTask: AgentTask = {
@@ -186,7 +180,7 @@ describe("AgentTranscriptDialog — ChatGPT-style conversation", () => {
 
   it("keeps reasoning collapsed by default and reveals it on click", () => {
     renderDialog();
-    const list = screen.getByTestId("virtuoso");
+    const list = screen.getByTestId("conv-list");
 
     expect(screen.queryByText(/Thinking hidden detail/)).not.toBeInTheDocument();
 
@@ -199,12 +193,14 @@ describe("AgentTranscriptDialog — ChatGPT-style conversation", () => {
 
   it("renders a paired tool card collapsed by default and expands to show the command", () => {
     renderDialog();
-    const list = screen.getByTestId("virtuoso");
+    const list = screen.getByTestId("conv-list");
 
-    expect(within(list).getByText("bash")).toBeInTheDocument();
+    // Collapsed minimal line: "Ran `pnpm test`" — the tool name isn't shown.
+    expect(within(list).getByText("Ran")).toBeInTheDocument();
+    expect(within(list).getByText("pnpm test")).toBeInTheDocument();
     expect(screen.queryByText("$ pnpm test")).not.toBeInTheDocument();
 
-    fireEvent.click(within(list).getByText("bash"));
+    fireEvent.click(within(list).getByText("Ran"));
 
     expect(screen.getByText("$ pnpm test")).toBeInTheDocument();
     expect(screen.getByText(/no output/)).toBeInTheDocument();

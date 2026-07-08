@@ -26,6 +26,7 @@
   "dependencies": {
     "@base-ui/react": "^1.3.0",
     "@emoji-mart/data": "^1.2.1",
+    "@shadcn/react": "^0.2.0",
     "@tanstack/react-table": "catalog:",
     "class-variance-authority": "catalog:",
     "clsx": "catalog:",
@@ -34,8 +35,8 @@
     "embla-carousel-react": "^8.6.0",
     "emoji-mart": "^5.6.0",
     "input-otp": "^1.4.2",
-    "linkify-it": "^5.0.0",
     "katex": "catalog:",
+    "linkify-it": "^5.0.0",
     "lucide-react": "catalog:",
     "motion": "^12.38.0",
     "next-themes": "^0.4.6",

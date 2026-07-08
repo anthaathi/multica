@@ -21,7 +21,13 @@ import {
 import { cn } from "@multica/ui/lib/utils";
 import { copyText } from "@multica/ui/lib/clipboard";
 import { Dialog, DialogContent, DialogTitle } from "@multica/ui/components/ui/dialog";
-import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
+import {
+  MessageScrollerProvider,
+  MessageScroller,
+  MessageScrollerViewport,
+  MessageScrollerContent,
+  MessageScrollerButton,
+} from "@multica/ui/components/ui/message-scroller";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -169,7 +175,7 @@ export function AgentTranscriptDialog({
   const clearPersistedFilterKeys = useTranscriptViewStore((s) => s.clearFilterKeys);
   const defaultExpanded = useTranscriptViewStore((s) => s.defaultExpanded);
   const setDefaultExpanded = useTranscriptViewStore((s) => s.setDefaultExpanded);
-  const virtuosoRef = useRef<VirtuosoHandle>(null);
+  const nodeRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const autoExpandedRef = useRef<Set<string>>(new Set());
   const initializedTaskRef = useRef<string | null>(null);
   const previousDefaultExpandedRef = useRef(defaultExpanded);
@@ -270,9 +276,10 @@ export function AgentTranscriptDialog({
     (dir: TranscriptSortDirection) => {
       if (dir === sortDirection) return;
       setSortDirection(dir);
-      virtuosoRef.current?.scrollToIndex({ index: 0, behavior: "smooth" });
+      const first = displayNodes[0];
+      if (first) nodeRefs.current.get(nodeKey(first))?.scrollIntoView({ behavior: "smooth" });
     },
-    [sortDirection, setSortDirection],
+    [sortDirection, setSortDirection, displayNodes],
   );
 
   const handleCopyWorkdir = useCallback(() => {
@@ -599,13 +606,9 @@ export function AgentTranscriptDialog({
             <TimelineBar
               nodes={displayNodes}
               selectedKey={selectedKey}
-              onSelect={(key, index) => {
+              onSelect={(key) => {
                 setSelectedKey(key);
-                virtuosoRef.current?.scrollToIndex({
-                  index,
-                  align: "center",
-                  behavior: "smooth",
-                });
+                nodeRefs.current.get(key)?.scrollIntoView({ behavior: "smooth", block: "center" });
               }}
             />
           </div>
@@ -615,7 +618,7 @@ export function AgentTranscriptDialog({
           <div className="border-b px-4 py-3 shrink-0 bg-muted/20">{headerSlot}</div>
         )}
 
-        {/* ── Conversation list (virtualized) ───────────────────── */}
+        {/* ── Conversation list ─────────────────────────────────── */}
         {displayNodes.length === 0 ? (
           <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
             {isLive ? (
@@ -628,20 +631,30 @@ export function AgentTranscriptDialog({
             )}
           </div>
         ) : (
-          <Virtuoso
-            ref={virtuosoRef}
-            className="flex-1"
-            data={displayNodes}
-            computeItemKey={(_, node) => nodeKey(node)}
-            increaseViewportBy={{ top: 400, bottom: 600 }}
-            itemContent={(_, node) => (
-              <ConversationRow
-                node={node}
-                expanded={expandedKeys.has(nodeKey(node))}
-                onExpandedChange={(open) => handleNodeExpandedChange(nodeKey(node), open)}
-              />
-            )}
-          />
+          <MessageScrollerProvider>
+            <MessageScroller className="flex-1">
+              <MessageScrollerViewport>
+                <MessageScrollerContent className="flex flex-col gap-2 p-4">
+                  {displayNodes.map((node) => {
+                    const key = nodeKey(node);
+                    return (
+                      <ConversationRow
+                        key={key}
+                        node={node}
+                        expanded={expandedKeys.has(nodeKey(node))}
+                        onExpandedChange={(open) => handleNodeExpandedChange(nodeKey(node), open)}
+                        rowRef={(el) => {
+                          if (el) nodeRefs.current.set(key, el);
+                          else nodeRefs.current.delete(key);
+                        }}
+                      />
+                    );
+                  })}
+                </MessageScrollerContent>
+                <MessageScrollerButton />
+              </MessageScrollerViewport>
+            </MessageScroller>
+          </MessageScrollerProvider>
         )}
       </DialogContent>
     </Dialog>
@@ -654,29 +667,27 @@ function ConversationRow({
   node,
   expanded,
   onExpandedChange,
+  rowRef,
 }: {
   node: ConversationNode;
   expanded: boolean;
   onExpandedChange: (open: boolean) => void;
+  rowRef?: (el: HTMLDivElement | null) => void;
 }) {
   const time = nodeTime(node);
   if (node.kind === "tool") {
     return (
-      <div className="px-4 py-1">
-        <ToolNodeCard
-          node={node}
-          expanded={expanded}
-          onExpandedChange={onExpandedChange}
-        />
+      <div ref={rowRef} data-node-key={nodeKey(node)}>
+        <ToolNodeCard node={node} expanded={expanded} onExpandedChange={onExpandedChange} />
       </div>
     );
   }
   if (node.kind === "text") {
     return (
-      <div className="px-4">
+      <div ref={rowRef} data-node-key={nodeKey(node)}>
         <AssistantMessage item={node.item} />
         {time && (
-          <div className="px-2 pb-1 text-[10px] tabular-nums text-muted-foreground/40">
+          <div className="mt-1 text-[10px] tabular-nums text-muted-foreground/40">
             {time}
           </div>
         )}
@@ -685,13 +696,13 @@ function ConversationRow({
   }
   if (node.kind === "thinking") {
     return (
-      <div className="px-4 py-0.5">
+      <div ref={rowRef} data-node-key={nodeKey(node)}>
         <ThinkingMessage item={node.item} />
       </div>
     );
   }
   return (
-    <div className="px-4 py-1.5">
+    <div ref={rowRef} data-node-key={nodeKey(node)}>
       <ErrorMessage item={node.item} />
     </div>
   );
@@ -706,7 +717,7 @@ function TimelineBar({
 }: {
   nodes: ConversationNode[];
   selectedKey: string | null;
-  onSelect: (key: string, index: number) => void;
+  onSelect: (key: string) => void;
 }) {
   const segments: { startIndex: number; count: number; color: NodeColor; keys: string[] }[] = [];
   let current: NodeColor | null = null;
@@ -757,7 +768,7 @@ function TimelineBar({
               seg.keys.some((k) => k === selectedKey) ? c.bgActive : c.bg,
             )}
             style={{ width: `${Math.max(width, 0.5)}%` }}
-            onClick={() => onSelect(seg.keys[0]!, seg.startIndex)}
+            onClick={() => onSelect(seg.keys[0]!)}
             title={`${label}${seg.count > 1 ? ` (${seg.count})` : ""}`}
           />
         );
