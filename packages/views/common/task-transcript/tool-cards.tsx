@@ -109,6 +109,7 @@ function TerminalBlock({ command, output }: { command?: string; output: string }
   return (
     <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950 dark:bg-black/60">
       <div className="flex items-center justify-between border-b border-zinc-800/80 px-3 py-1.5">
+        {/* eslint-disable-next-line i18next/no-literal-string */}
         <span className="font-mono text-[11px] text-zinc-400">terminal</span>
         <CopyChip getText={() => `${command ?? ""}\n${output}`} label="Copy output" />
       </div>
@@ -117,6 +118,7 @@ function TerminalBlock({ command, output }: { command?: string; output: string }
         {output ? (
           <pre className="mt-1 whitespace-pre-wrap break-words text-zinc-300">{shown}</pre>
         ) : (
+          // eslint-disable-next-line i18next/no-literal-string
           <div className="mt-1 text-zinc-600">— no output —</div>
         )}
         {long && (
@@ -239,6 +241,7 @@ export const ToolNodeCard = memo(function ToolNodeCard({ node, expanded, onExpan
       <div className="rounded-lg border bg-muted/30 px-3 py-2 font-mono text-[11px]">
         {matches.count !== undefined && (
           <div className="mb-1 text-muted-foreground">
+            {/* eslint-disable-next-line i18next/no-literal-string */}
             {matches.count} match{matches.count === 1 ? "" : "es"}
           </div>
         )}
@@ -325,6 +328,7 @@ export function ThinkingMessage({ item }: { item: TimelineItem }) {
         <MarkerContent className="flex items-center gap-1.5 text-xs italic text-muted-foreground">
           <ChevronRight className={cn("size-3 shrink-0 transition-transform", open && "rotate-90")} />
           {open ? "Hide reasoning" : "Reasoning"}
+          {/* eslint-disable-next-line i18next/no-literal-string */}
           <span className="not-italic text-muted-foreground/50">{text.length.toLocaleString()} chars</span>
         </MarkerContent>
       </CollapsibleTrigger>
