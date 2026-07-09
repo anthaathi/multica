@@ -157,4 +157,11 @@ const (
 	// invalidate the Slack installations query on either.
 	EventSlackInstallationCreated = "slack_installation:created"
 	EventSlackInstallationRevoked = "slack_installation:revoked"
+
+	// Mattermost installation lifecycle. Same semantics as the Slack events:
+	// `created` covers both first install and re-install, `revoked` flips
+	// status without deleting the row. Front-ends invalidate the Mattermost
+	// installations query on either.
+	EventMattermostInstallationCreated = "mattermost_installation:created"
+	EventMattermostInstallationRevoked = "mattermost_installation:revoked"
 )

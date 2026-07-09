@@ -61,6 +61,13 @@ vi.mock("@multica/core/slack", () => ({
   }),
 }));
 
+vi.mock("@multica/core/mattermost", () => ({
+  mattermostInstallationsOptions: () => ({
+    queryKey: ["mattermost", "installations"],
+    queryFn: vi.fn(),
+  }),
+}));
+
 vi.mock("@multica/core/auth", () => {
   const useAuthStore = Object.assign(
     (sel?: (s: { user: { id: string } }) => unknown) =>
@@ -91,6 +98,15 @@ vi.mock("../../../settings/components/lark-tab", () => ({
 vi.mock("../../../settings/components/slack-tab", () => ({
   SlackAgentBindButton: ({ agentId }: { agentId: string }) => (
     <div data-testid="slack-bind-button" data-agent-id={agentId} />
+  ),
+}));
+
+// MattermostAgentBindButton is the shared bind entry covered in
+// mattermost-tab.test.tsx; here it is a marker so the tests assert branch
+// selection, not the install flow.
+vi.mock("../../../settings/components/mattermost-tab", () => ({
+  MattermostAgentBindButton: ({ agentId }: { agentId: string }) => (
+    <div data-testid="mattermost-bind-button" data-agent-id={agentId} />
   ),
 }));
 
@@ -199,10 +215,13 @@ describe("IntegrationsTab", () => {
     expect(larkButton.getAttribute("data-agent-id")).toBe("agent-1");
     expect(larkButton.getAttribute("data-agent-owner-id")).toBe("user-1");
     expect(screen.queryByTestId("slack-bind-button")).toBeNull();
-    // The Slack section falls back to the shared members note.
-    expect(
-      screen.getByText(/Only workspace owners and admins can connect an agent/i),
-    ).toBeTruthy();
+    // Both admin-only platforms (Slack + Mattermost) fall back to the shared
+    // members note instead of a bind CTA — two notes, one per section.
+    const adminOnlyNotes = screen.getAllByText(
+      /Only workspace owners and admins can connect an agent/i,
+    );
+    expect(adminOnlyNotes).toHaveLength(2);
+    expect(screen.queryByTestId("mattermost-bind-button")).toBeNull();
   });
 
   it("renders the bind entry (not coming-soon) when installs are unavailable but the agent is already bound", () => {

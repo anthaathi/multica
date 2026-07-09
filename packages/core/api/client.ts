@@ -124,6 +124,10 @@ import type {
   ListSlackInstallationsResponse,
   RegisterSlackBYORequest,
   RedeemSlackBindingTokenResponse,
+  MattermostInstallation,
+  ListMattermostInstallationsResponse,
+  RegisterMattermostBYORequest,
+  RedeemMattermostBindingTokenResponse,
   Squad,
   SquadMember,
   SquadMemberStatusListResponse,
@@ -2445,6 +2449,44 @@ export class ApiClient {
 
   async redeemSlackBindingToken(token: string): Promise<RedeemSlackBindingTokenResponse> {
     return this.fetch(`/api/slack/binding/redeem`, {
+      method: "POST",
+      body: JSON.stringify({ token }),
+    });
+  }
+
+  // Mattermost integration
+  async listMattermostInstallations(
+    workspaceId: string,
+  ): Promise<ListMattermostInstallationsResponse> {
+    return this.fetch(`/api/workspaces/${workspaceId}/mattermost/installations`);
+  }
+
+  // registerMattermostBYO performs a bring-your-own-bot install: the admin
+  // pastes the Mattermost server URL + the bot account's access token, and the
+  // backend validates + persists it, returning the new installation.
+  async registerMattermostBYO(
+    workspaceId: string,
+    agentId: string,
+    body: RegisterMattermostBYORequest,
+  ): Promise<MattermostInstallation> {
+    const search = new URLSearchParams({ agent_id: agentId });
+    return this.fetch(
+      `/api/workspaces/${workspaceId}/mattermost/install/byo?${search.toString()}`,
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+      },
+    );
+  }
+
+  async deleteMattermostInstallation(workspaceId: string, installationId: string): Promise<void> {
+    await this.fetch(`/api/workspaces/${workspaceId}/mattermost/installations/${installationId}`, {
+      method: "DELETE",
+    });
+  }
+
+  async redeemMattermostBindingToken(token: string): Promise<RedeemMattermostBindingTokenResponse> {
+    return this.fetch(`/api/mattermost/binding/redeem`, {
       method: "POST",
       body: JSON.stringify({ token }),
     });

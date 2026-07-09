@@ -26,6 +26,7 @@ import (
 	composio "github.com/multica-ai/multica/server/internal/integrations/composio"
 	"github.com/multica-ai/multica/server/internal/integrations/issuesync"
 	"github.com/multica-ai/multica/server/internal/integrations/lark"
+	"github.com/multica-ai/multica/server/internal/integrations/mattermost"
 	"github.com/multica-ai/multica/server/internal/integrations/slack"
 	obsmetrics "github.com/multica-ai/multica/server/internal/metrics"
 	"github.com/multica-ai/multica/server/internal/middleware"
@@ -200,6 +201,19 @@ type Handler struct {
 	// unless Slack is configured; GetChatChannelHistory then reports "no channel
 	// integration". A future platform satisfies the same reader interface.
 	SlackHistory ChatChannelHistoryReader
+	// MattermostInstall owns the bring-your-own-bot Mattermost install lifecycle
+	// (register pasted server URL + token / list / revoke) and the at-rest
+	// encryption of each bot's token. Nil unless MULTICA_MATTERMOST_SECRET_KEY
+	// is set.
+	MattermostInstall *mattermost.InstallService
+	// MattermostBindingTokens mints/redeems the user-binding tokens behind the
+	// "link your Mattermost account" prompt. Nil unless Mattermost is
+	// configured (MULTICA_MATTERMOST_SECRET_KEY set).
+	MattermostBindingTokens *mattermost.BindingTokenService
+	// MattermostHistory reads a chat session's bound Mattermost conversation on
+	// demand, behind the same unified `multica chat history` command as
+	// SlackHistory. Nil unless Mattermost is configured.
+	MattermostHistory ChatChannelHistoryReader
 	// GitLabBox encrypts/decrypts the OAuth tokens and per-connection webhook
 	// secrets stored in gitlab_connection. Nil unless MULTICA_GITLAB_SECRET_KEY
 	// is set; the GitLab HTTP handlers then report "not configured" (no

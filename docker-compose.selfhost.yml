@@ -128,6 +128,11 @@ services:
       # in the database, so this single deployment-wide key is all the operator
       # needs to set here.
       MULTICA_SLACK_SECRET_KEY: ${MULTICA_SLACK_SECRET_KEY:-}
+      # Mattermost bot integration. Same opt-in model as Slack: unset =
+      # integration disabled. It decrypts the per-installation bot tokens,
+      # which are brought by each workspace (BYO paste of server URL + bot
+      # access token) and stored encrypted in the database.
+      MULTICA_MATTERMOST_SECRET_KEY: ${MULTICA_MATTERMOST_SECRET_KEY:-}
     restart: unless-stopped
 
   frontend:

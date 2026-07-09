@@ -25,6 +25,7 @@ import { githubKeys } from "../github/queries";
 import { gitlabKeys } from "../gitlab/queries";
 import { larkKeys } from "../lark/queries";
 import { slackKeys } from "../slack/queries";
+import { mattermostKeys } from "../mattermost/queries";
 import { syncSourceKeys, jiraConnectionKeys } from "../issue-sync/queries";
 import {
   onIssueCreated,
@@ -537,6 +538,10 @@ export function useRealtimeSync(
       slack_installation: () => {
         const wsId = getCurrentWsId();
         if (wsId) qc.invalidateQueries({ queryKey: slackKeys.installations(wsId) });
+      },
+      mattermost_installation: () => {
+        const wsId = getCurrentWsId();
+        if (wsId) qc.invalidateQueries({ queryKey: mattermostKeys.installations(wsId) });
       },
       pull_request: () => {
         // PR list is keyed by issue id, not workspace, so we invalidate all

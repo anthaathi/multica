@@ -10,14 +10,16 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/multica-ai/multica/server/internal/integrations/channel"
+	"github.com/multica-ai/multica/server/internal/integrations/mattermost"
 	"github.com/multica-ai/multica/server/internal/integrations/slack"
 	"github.com/multica-ai/multica/server/internal/logger"
 	"github.com/multica-ai/multica/server/internal/util"
 )
 
-// ChatChannelHistoryReader reads a chat session's bound IM-channel history. The
-// Slack reader (slack.History) satisfies it; a future platform registers its
-// own. Two operations back the two agent commands: ChannelOverview is the
+// ChatChannelHistoryReader reads a chat session's bound IM-channel history.
+// The Slack (slack.History) and Mattermost (mattermost.History) readers
+// satisfy it; a future platform registers its own. Two operations back the two
+// agent commands: ChannelOverview is the
 // channel table-of-contents (`multica chat history`), Thread reads one thread's
 // messages (`multica chat thread [id]`). Both are scoped server-side to the
 // session's own channel (MUL-3871).
@@ -48,11 +50,14 @@ func (h *Handler) GetChatChannelHistory(w http.ResponseWriter, r *http.Request) 
 	if !ok {
 		return
 	}
-	if h.SlackHistory == nil {
+	readers := h.chatHistoryReaders()
+	if len(readers) == 0 {
 		h.writeNoChannelIntegration(w)
 		return
 	}
-	page, err := h.SlackHistory.ChannelOverview(r.Context(), sessionID, historyOptionsFrom(r))
+	page, err := readChannelHistory(readers, func(reader ChatChannelHistoryReader) (channel.HistoryPage, error) {
+		return reader.ChannelOverview(r.Context(), sessionID, historyOptionsFrom(r))
+	})
 	h.respondChatHistory(w, r, sessionID, page, err)
 }
 
@@ -65,13 +70,57 @@ func (h *Handler) GetChatThread(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if h.SlackHistory == nil {
+	readers := h.chatHistoryReaders()
+	if len(readers) == 0 {
 		h.writeNoChannelIntegration(w)
 		return
 	}
 	threadID := r.URL.Query().Get("id")
-	page, err := h.SlackHistory.Thread(r.Context(), sessionID, threadID, historyOptionsFrom(r))
+	page, err := readChannelHistory(readers, func(reader ChatChannelHistoryReader) (channel.HistoryPage, error) {
+		return reader.Thread(r.Context(), sessionID, threadID, historyOptionsFrom(r))
+	})
 	h.respondChatHistory(w, r, sessionID, page, err)
+}
+
+// chatHistoryReaders lists the configured per-platform readers. Each reader
+// answers only for sessions bound to ITS channel type (a miss is the
+// platform's "no session" sentinel), so trying them in order is a dispatch,
+// not a merge. Known debt: with more platforms this should become a
+// binding-channel_type lookup instead of a chain.
+func (h *Handler) chatHistoryReaders() []ChatChannelHistoryReader {
+	readers := make([]ChatChannelHistoryReader, 0, 2)
+	if h.SlackHistory != nil {
+		readers = append(readers, h.SlackHistory)
+	}
+	if h.MattermostHistory != nil {
+		readers = append(readers, h.MattermostHistory)
+	}
+	return readers
+}
+
+// readChannelHistory runs one read across the configured readers: the first
+// reader that recognizes the session (does not return its no-session sentinel)
+// answers. When every reader misses, the last sentinel is returned so
+// respondChatHistory renders the "not channel-backed" note.
+func readChannelHistory(readers []ChatChannelHistoryReader, read func(ChatChannelHistoryReader) (channel.HistoryPage, error)) (channel.HistoryPage, error) {
+	var (
+		page channel.HistoryPage
+		err  error
+	)
+	for _, reader := range readers {
+		page, err = read(reader)
+		if !isNoChannelSession(err) {
+			return page, err
+		}
+	}
+	return page, err
+}
+
+// isNoChannelSession reports whether err is a platform's "this session is not
+// bound to my channel" sentinel — the signal to fall through to the next
+// reader (and, at the end of the chain, to answer with the friendly note).
+func isNoChannelSession(err error) bool {
+	return errors.Is(err, slack.ErrNoSlackSession) || errors.Is(err, mattermost.ErrNoMattermostSession)
 }
 
 // chatHistorySession authorizes the request and returns the caller's own chat
@@ -123,7 +172,7 @@ func (h *Handler) chatHistorySession(w http.ResponseWriter, r *http.Request) (pg
 // is not channel-backed, a 502 on a real read failure, the page otherwise.
 func (h *Handler) respondChatHistory(w http.ResponseWriter, r *http.Request, sessionID pgtype.UUID, page channel.HistoryPage, err error) {
 	if err != nil {
-		if errors.Is(err, slack.ErrNoSlackSession) {
+		if isNoChannelSession(err) {
 			writeJSON(w, http.StatusOK, ChatChannelHistoryResponse{
 				Messages: []channel.HistoryMessage{},
 				Note:     "This conversation is not connected to a chat channel, so there is no channel history to read.",

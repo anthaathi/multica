@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { LarkTab } from "./lark-tab";
 import { ComposioTab } from "./composio-tab";
 import { SlackTab } from "./slack-tab";
+import { MattermostTab } from "./mattermost-tab";
 import { ApiError } from "@multica/core/api";
 import { composioToolkitsOptions } from "@multica/core/composio";
 import { useFeatureEnabled } from "@multica/core/config";
@@ -45,6 +46,10 @@ export function IntegrationsTab() {
       <section className="space-y-4">
         <h2 className="text-sm font-semibold">{t(($) => $.slack.section_title)}</h2>
         <SlackTab />
+      </section>
+      <section className="space-y-4">
+        <h2 className="text-sm font-semibold">{t(($) => $.mattermost.section_title)}</h2>
+        <MattermostTab />
       </section>
     </div>
   );

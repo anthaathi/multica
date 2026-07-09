@@ -48,6 +48,7 @@ import { ThinkingPropRow } from "./inspector/thinking-prop-row";
 import { AccessPicker } from "./inspector/access-picker";
 import { LarkAgentBindButton } from "../../settings/components/lark-tab";
 import { SlackAgentBindButton } from "../../settings/components/slack-tab";
+import { MattermostAgentBindButton } from "../../settings/components/mattermost-tab";
 
 interface InspectorProps {
   agent: Agent;
@@ -249,6 +250,11 @@ export function AgentDetailInspector({
               onShowConnectedDetails={onShowIntegrations}
             />
             <SlackAgentBindButton
+              agentId={agent.id}
+              agentName={agent.name}
+              onShowConnectedDetails={onShowIntegrations}
+            />
+            <MattermostAgentBindButton
               agentId={agent.id}
               agentName={agent.name}
               onShowConnectedDetails={onShowIntegrations}

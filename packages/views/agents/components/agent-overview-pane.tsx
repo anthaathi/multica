@@ -21,6 +21,7 @@ import { COMPOSIO_MCP_APPS_FLAG } from "@multica/core/feature-flags";
 import { useWorkspaceId } from "@multica/core/hooks";
 import { larkInstallationsOptions } from "@multica/core/lark";
 import { slackInstallationsOptions } from "@multica/core/slack";
+import { mattermostInstallationsOptions } from "@multica/core/mattermost";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -163,9 +164,14 @@ export function AgentOverviewPane({
     enabled: !!wsId,
   });
   const slackConfigured = slackListing?.configured === true;
-  // The Integrations tab appears once EITHER channel is wired on the
-  // deployment, so a Slack-only deployment (no Lark) still surfaces it.
-  const integrationsConfigured = larkConfigured || slackConfigured;
+  const { data: mattermostListing } = useQuery({
+    ...mattermostInstallationsOptions(wsId),
+    enabled: !!wsId,
+  });
+  const mattermostConfigured = mattermostListing?.configured === true;
+  // The Integrations tab appears once ANY channel is wired on the deployment,
+  // so a Slack-only or Mattermost-only deployment still surfaces it.
+  const integrationsConfigured = larkConfigured || slackConfigured || mattermostConfigured;
 
   // The MCP tab is only shown when the agent's runtime backend actually
   // consumes mcp_config — see providerSupportsMcpConfig. We default to

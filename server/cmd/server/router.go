@@ -30,6 +30,7 @@ import (
 	composiointeg "github.com/multica-ai/multica/server/internal/integrations/composio"
 	"github.com/multica-ai/multica/server/internal/integrations/issuesync"
 	"github.com/multica-ai/multica/server/internal/integrations/lark"
+	"github.com/multica-ai/multica/server/internal/integrations/mattermost"
 	"github.com/multica-ai/multica/server/internal/integrations/slack"
 	obsmetrics "github.com/multica-ai/multica/server/internal/metrics"
 	"github.com/multica-ai/multica/server/internal/middleware"
@@ -512,6 +513,69 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 		slog.Info("slack integration disabled (MULTICA_SLACK_SECRET_KEY not set)")
 	}
 
+	// Mattermost integration. Bring-your-own-bot model like Slack: the
+	// workspace admin creates a bot account in their Mattermost System Console
+	// and pastes the server URL + bot access token. One env var gates it all:
+	// MULTICA_MATTERMOST_SECRET_KEY decrypts the per-installation bot token
+	// stored on the channel_installation row; the same token authenticates the
+	// per-installation events WebSocket (inbound) and the REST API (outbound).
+	// The ResolverSet/Outbound share the same engine.ChatSession, channel_*
+	// tables, IssueService and TaskService as Slack/Feishu, so /issue, dedup,
+	// and run-triggering behave identically.
+	if mmKey, err := secretbox.LoadKey("MULTICA_MATTERMOST_SECRET_KEY"); err == nil {
+		box, err := secretbox.New(mmKey)
+		if err != nil {
+			slog.Error("mattermost: secretbox.New failed; mattermost integration disabled", "error", err)
+		} else {
+			// Outbound replier: delivers NeedsBinding prompt / AgentOffline /
+			// AgentArchived / issue-created notices. The binding token service
+			// mints the single-use token embedded in the prompt's redeem link;
+			// the redeem endpoint (registered below, public) binds the
+			// Mattermost user to their Multica account.
+			mmBindingSvc := mattermost.NewBindingTokenService(queries, pool)
+			h.MattermostBindingTokens = mmBindingSvc
+			mmReplier := mattermost.NewOutboundReplier(mattermost.OutboundReplierConfig{
+				Binding: mmBindingSvc,
+				Decrypt: box.Open,
+				// The bind link (/mattermost/bind) is a web-app page, so it must
+				// use the app URL (MULTICA_APP_URL ?? FRONTEND_ORIGIN), NOT
+				// MULTICA_PUBLIC_URL (the backend/API URL). Mirrors Slack/Lark.
+				AppURL: appURLFromEnv(),
+				Logger: slog.Default(),
+			})
+			// Typing indicator: a 👀 reaction on the user's post while the agent
+			// works, cleared when the run finishes or fails. Best-effort;
+			// registered before the outbound reply subscriber so, on
+			// EventChatDone, the reaction clears ahead of the reply (bus delivery
+			// is synchronous, in subscription order).
+			mmTyping := mattermost.NewTypingIndicatorManager(queries, box.Open, slog.Default())
+			mmTyping.Register(bus)
+			channelRouter.Register(mattermost.TypeMattermost, mattermost.NewMattermostResolverSet(queries, pool, mmReplier, mmTyping))
+			mattermost.NewOutbound(queries, box.Open, slog.Default()).Register(bus)
+
+			// On-demand history reader behind the unified `multica chat history`
+			// command, dispatched by session binding alongside SlackHistory.
+			h.MattermostHistory = mattermost.NewHistory(queries, box.Open, slog.Default())
+
+			// Per-installation inbound: the Supervisor builds + supervises one
+			// events WebSocket per active Mattermost installation, authenticated
+			// with that installation's bot token.
+			mattermost.RegisterMattermost(channelRegistry, mattermost.ChannelDeps{Decrypt: box.Open, Logger: slog.Default()})
+
+			// BYO self-serve install (paste server URL + bot token). The
+			// InstallService needs only the at-rest encryption key.
+			mmInstallSvc, ierr := mattermost.NewInstallService(queries, pool, box, slog.Default())
+			if ierr != nil {
+				slog.Error("mattermost: InstallService init failed; install disabled", "error", ierr)
+			} else {
+				h.MattermostInstall = mmInstallSvc
+			}
+			slog.Info("mattermost integration enabled (BYO per-installation websocket)")
+		}
+	} else {
+		slog.Info("mattermost integration disabled (MULTICA_MATTERMOST_SECRET_KEY not set)")
+	}
+
 	// GitLab integration: at-rest encryption of OAuth tokens + per-connection
 	// webhook secrets. Nil box → the GitLab HTTP handlers report "not
 	// configured" (no plaintext token storage), mirroring Slack/Lark.
@@ -973,6 +1037,20 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					r.Delete("/slack/installations/{installationId}", h.RevokeSlackInstallation)
 					r.Post("/slack/install/byo", h.RegisterSlackBYO)
 				})
+
+				// Mattermost integration. Same admin/member split as Slack:
+				// listing is member-visible; BYO install + revoke are
+				// admin-only. There is no OAuth callback — BYO is a pasted
+				// server URL + bot token.
+				r.Group(func(r chi.Router) {
+					r.Use(middleware.RequireWorkspaceMemberFromURL(queries, "id"))
+					r.Get("/mattermost/installations", h.ListMattermostInstallations)
+				})
+				r.Group(func(r chi.Router) {
+					r.Use(middleware.RequireWorkspaceRoleFromURL(queries, "id", "owner", "admin"))
+					r.Delete("/mattermost/installations/{installationId}", h.RevokeMattermostInstallation)
+					r.Post("/mattermost/install/byo", h.RegisterMattermostBYO)
+				})
 			})
 		})
 
@@ -989,6 +1067,11 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 		// logged-in user (from the session) is bound to the Slack id the token
 		// carries.
 		r.Post("/api/slack/binding/redeem", h.RedeemSlackBindingToken)
+		// Mattermost binding-token redemption. Same rationale as Slack/Lark:
+		// NOT workspace-scoped because the redeemer hits this before they have
+		// any workspace context — the redemption itself mints their binding
+		// row.
+		r.Post("/api/mattermost/binding/redeem", h.RedeemMattermostBindingToken)
 
 		// Composio integration (MUL-3720). User-scoped (no workspace context):
 		// a connection belongs to a user. These four require a logged-in

@@ -172,6 +172,12 @@ export type {
   RedeemSlackBindingTokenResponse,
 } from "./slack";
 export type {
+  MattermostInstallation,
+  ListMattermostInstallationsResponse,
+  RegisterMattermostBYORequest,
+  RedeemMattermostBindingTokenResponse,
+} from "./mattermost";
+export type {
   Autopilot,
   AutopilotStatus,
   AutopilotExecutionMode,

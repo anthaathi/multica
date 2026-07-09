@@ -11,6 +11,7 @@ import (
 
 	"github.com/multica-ai/multica/server/internal/integrations/channel"
 	"github.com/multica-ai/multica/server/internal/integrations/slack"
+	"github.com/multica-ai/multica/server/internal/integrations/mattermost"
 )
 
 type fakeChatHistoryReader struct {
@@ -246,5 +247,121 @@ func TestGetChatHistory_NonChatTask(t *testing.T) {
 	testHandler.GetChatChannelHistory(w, taskActorReq("/api/chat/history", taskID))
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400: %s", w.Code, w.Body.String())
+	}
+}
+
+// withMattermostHistory swaps testHandler's Mattermost reader for the duration
+// of the test, restoring it on cleanup. Mirrors withSlackHistory.
+func withMattermostHistory(t *testing.T, r ChatChannelHistoryReader) {
+	t.Helper()
+	orig := testHandler.MattermostHistory
+	testHandler.MattermostHistory = r
+	t.Cleanup(func() { testHandler.MattermostHistory = orig })
+}
+
+// The chat-history dispatch tries Slack first, then Mattermost (see
+// chatHistoryReaders + readChannelHistory): a session Slack does not own
+// (slack.ErrNoSlackSession) must fall through to the Mattermost reader instead
+// of surfacing the Slack miss.
+func TestChatChannelHistory_MattermostFallThrough(t *testing.T) {
+	if testHandler == nil {
+		t.Skip("requires test database")
+	}
+	taskID := newChatHistoryTask(t, true)
+	mmPage := channel.HistoryPage{
+		ChannelType: "mattermost",
+		Messages: []channel.HistoryMessage{
+			{ID: "mm-1", Author: "Carol", Role: channel.HistoryRoleUser, Text: "hello from mattermost", TS: "1"},
+		},
+		NextCursor: "mm-cursor",
+	}
+	slackReader := &fakeChatHistoryReader{err: slack.ErrNoSlackSession}
+	mmReader := &fakeChatHistoryReader{page: mmPage}
+	withSlackHistory(t, slackReader)
+	withMattermostHistory(t, mmReader)
+
+	w := httptest.NewRecorder()
+	testHandler.GetChatChannelHistory(w, taskActorReq("/api/chat/history", taskID))
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200: %s", w.Code, w.Body.String())
+	}
+	var resp ChatChannelHistoryResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.ChannelType != "mattermost" || len(resp.Messages) != 1 || resp.Messages[0].Text != "hello from mattermost" {
+		t.Fatalf("expected the Mattermost page to win the dispatch, got %+v", resp)
+	}
+	if slackReader.overviewCalls != 1 {
+		t.Errorf("Slack reader must be tried first: overviewCalls = %d, want 1", slackReader.overviewCalls)
+	}
+	if mmReader.overviewCalls != 1 {
+		t.Errorf("Mattermost reader must be the fallback: overviewCalls = %d, want 1", mmReader.overviewCalls)
+	}
+}
+
+// When NEITHER platform owns the session (Slack ErrNoSlackSession AND Mattermost
+// ErrNoMattermostSession), the terminal not-found case maps to the friendly
+// "not connected to a chat channel" note (200), not an error — see
+// respondChatHistory's isNoChannelSession branch.
+func TestChatChannelHistory_BothNoSessionNote(t *testing.T) {
+	if testHandler == nil {
+		t.Skip("requires test database")
+	}
+	taskID := newChatHistoryTask(t, true)
+	withSlackHistory(t, &fakeChatHistoryReader{err: slack.ErrNoSlackSession})
+	withMattermostHistory(t, &fakeChatHistoryReader{err: mattermost.ErrNoMattermostSession})
+
+	w := httptest.NewRecorder()
+	testHandler.GetChatChannelHistory(w, taskActorReq("/api/chat/history", taskID))
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 (note), body: %s", w.Code, w.Body.String())
+	}
+	var resp ChatChannelHistoryResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.Note == "" || len(resp.Messages) != 0 {
+		t.Fatalf("expected empty messages + a note when no platform backs the session, got %+v", resp)
+	}
+}
+
+// The same Slack→Mattermost dispatch backs GetChatThread: a Slack miss on the
+// thread read falls through to the Mattermost thread reader.
+func TestChatThread_MattermostFallThrough(t *testing.T) {
+	if testHandler == nil {
+		t.Skip("requires test database")
+	}
+	taskID := newChatHistoryTask(t, true)
+	mmThread := channel.HistoryPage{
+		ChannelType: "mattermost",
+		ThreadID:    "mm-root",
+		Messages:    []channel.HistoryMessage{{ID: "mm-root", Author: "Dan", Role: channel.HistoryRoleUser, Text: "thread root", TS: "9"}},
+	}
+	slackReader := &fakeChatHistoryReader{err: slack.ErrNoSlackSession}
+	mmReader := &fakeChatHistoryReader{page: mmThread}
+	withSlackHistory(t, slackReader)
+	withMattermostHistory(t, mmReader)
+
+	w := httptest.NewRecorder()
+	testHandler.GetChatThread(w, taskActorReq("/api/chat/thread?id=mm-root", taskID))
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200: %s", w.Code, w.Body.String())
+	}
+	var resp ChatChannelHistoryResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.ThreadID != "mm-root" || resp.ChannelType != "mattermost" {
+		t.Fatalf("expected the Mattermost thread page, got %+v", resp)
+	}
+	if slackReader.threadCalls != 1 || mmReader.threadCalls != 1 {
+		t.Errorf("expected Slack then Mattermost thread reads (1/1), got slack=%d mm=%d", slackReader.threadCalls, mmReader.threadCalls)
+	}
+	if mmReader.gotThreadID != "mm-root" {
+		t.Errorf("thread id passed to Mattermost reader = %q, want mm-root", mmReader.gotThreadID)
 	}
 }

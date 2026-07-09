@@ -48,6 +48,9 @@ const larkListingRef = vi.hoisted(() => ({
 const slackListingRef = vi.hoisted(() => ({
   current: { installations: [] as unknown[], configured: false },
 }));
+const mattermostListingRef = vi.hoisted(() => ({
+  current: { installations: [] as unknown[], configured: false },
+}));
 vi.mock("@multica/core/hooks", () => ({
   useWorkspaceId: () => "ws-1",
 }));
@@ -61,6 +64,12 @@ vi.mock("@multica/core/slack", () => ({
   slackInstallationsOptions: () => ({
     queryKey: ["slack", "installations"],
     queryFn: () => Promise.resolve(slackListingRef.current),
+  }),
+}));
+vi.mock("@multica/core/mattermost", () => ({
+  mattermostInstallationsOptions: () => ({
+    queryKey: ["mattermost", "installations"],
+    queryFn: () => Promise.resolve(mattermostListingRef.current),
   }),
 }));
 
@@ -131,6 +140,7 @@ function renderPane(runtimes: AgentRuntime[]) {
 beforeEach(() => {
   larkListingRef.current = { installations: [], configured: false };
   slackListingRef.current = { installations: [], configured: false };
+  mattermostListingRef.current = { installations: [], configured: false };
 });
 
 describe("AgentOverviewPane MCP tab visibility", () => {
@@ -179,6 +189,18 @@ describe("AgentOverviewPane Integrations tab visibility", () => {
     // Regression: the tab gate must consider Slack too, not just Lark —
     // a Slack-only deployment was hiding the tab (and its bind entry).
     slackListingRef.current = { installations: [], configured: true };
+    renderPane([makeRuntime("claude")]);
+    expect(
+      await screen.findByRole("button", { name: /^Integrations$/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the Integrations tab when only Mattermost is configured (Lark/Slack off)", async () => {
+    // Regression mirror of the Slack case: the tab gate unions every
+    // channel, so a Mattermost-only deployment must surface the tab (and
+    // its bind entry) too — larkConfigured || slackConfigured alone would
+    // hide it.
+    mattermostListingRef.current = { installations: [], configured: true };
     renderPane([makeRuntime("claude")]);
     expect(
       await screen.findByRole("button", { name: /^Integrations$/i }),

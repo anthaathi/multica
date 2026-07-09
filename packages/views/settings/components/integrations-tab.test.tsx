@@ -44,6 +44,10 @@ vi.mock("./slack-tab", () => ({
   SlackTab: () => <div data-testid="slack-tab" />,
 }));
 
+vi.mock("./mattermost-tab", () => ({
+  MattermostTab: () => <div data-testid="mattermost-tab" />,
+}));
+
 import { IntegrationsTab } from "./integrations-tab";
 
 function renderTab() {
@@ -84,5 +88,17 @@ describe("Settings IntegrationsTab", () => {
     renderTab();
 
     expect(screen.queryByTestId("composio-tab")).toBeNull();
+  });
+  it("renders a section for every channel integration, including Mattermost", () => {
+    renderTab();
+
+    expect(screen.getByTestId("lark-tab")).toBeInTheDocument();
+    expect(screen.getByTestId("composio-tab")).toBeInTheDocument();
+    expect(screen.getByTestId("slack-tab")).toBeInTheDocument();
+    // Mattermost slots in as its own section alongside the others.
+    expect(screen.getByTestId("mattermost-tab")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: /^Mattermost$/i }),
+    ).toBeInTheDocument();
   });
 });
