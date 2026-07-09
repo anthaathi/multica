@@ -20,6 +20,7 @@ import (
 	"github.com/multica-ai/multica/server/internal/analytics"
 	"github.com/multica-ai/multica/server/internal/auth"
 	"github.com/multica-ai/multica/server/internal/daemonws"
+	"github.com/multica-ai/multica/server/internal/integrations/mattermost"
 	"github.com/multica-ai/multica/server/internal/integrations/slack"
 	obsmetrics "github.com/multica-ai/multica/server/internal/metrics"
 	"github.com/multica-ai/multica/server/internal/middleware"
@@ -1727,20 +1728,29 @@ func (h *Handler) ClaimTaskByRuntime(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			// Flag a channel-backed session so the daemon makes the agent aware
-			// it is operating inside Slack — read this conversation's history
-			// from the channel via `multica chat history` / `multica chat thread`,
-			// not from Multica (MUL-3871). Empty for a web-only chat session.
+			// it is operating inside an IM channel (Slack or Mattermost) — read
+			// this conversation's history from the channel via `multica chat
+			// history` / `multica chat thread`, not from Multica (MUL-3871).
+			// Empty for a web-only chat session. Previously this was Slack-only,
+			// which left Mattermost sessions prompting like a direct web chat
+			// (the agent then recalled + stalled with no reply). Channel-agnostic
+			// so a future adapter needs no edit here.
 			// ChatInThread tells the agent which command to start with: the
 			// latest trigger was a thread reply iff its reply-target thread
 			// (last_thread_id) differs from its own message id (a top-level
 			// @mention records its own ts as both).
-			if binding, berr := h.Queries.GetChannelChatSessionBindingBySession(r.Context(), db.GetChannelChatSessionBindingBySessionParams{
-				ChatSessionID: cs.ID,
-				ChannelType:   string(slack.TypeSlack),
-			}); berr == nil {
-				resp.ChatChannelType = string(slack.TypeSlack)
+			for _, ct := range []string{string(slack.TypeSlack), string(mattermost.TypeMattermost)} {
+				binding, berr := h.Queries.GetChannelChatSessionBindingBySession(r.Context(), db.GetChannelChatSessionBindingBySessionParams{
+					ChatSessionID: cs.ID,
+					ChannelType:   ct,
+				})
+				if berr != nil {
+					continue
+				}
+				resp.ChatChannelType = ct
 				resp.ChatInThread = binding.LastThreadID.Valid && binding.LastThreadID.String != "" &&
 					binding.LastThreadID.String != binding.LastMessageID.String
+				break
 			}
 			if ws, err := h.Queries.GetWorkspace(r.Context(), cs.WorkspaceID); err == nil && ws.Repos != nil {
 				var repos []RepoData

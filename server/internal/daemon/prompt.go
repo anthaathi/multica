@@ -281,6 +281,8 @@ func channelDisplayName(channelType string) string {
 	switch channelType {
 	case "slack":
 		return "Slack"
+	case "mattermost":
+		return "Mattermost"
 	default:
 		return channelType
 	}
