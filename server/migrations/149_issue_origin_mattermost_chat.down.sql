@@ -4,4 +4,4 @@
 -- relabeled those rows. Mirrors 131.
 ALTER TABLE issue DROP CONSTRAINT IF EXISTS issue_origin_type_check;
 ALTER TABLE issue ADD CONSTRAINT issue_origin_type_check
-    CHECK (origin_type IN ('autopilot', 'quick_create', 'lark_chat', 'slack_chat'));
+    CHECK (origin_type IN ('autopilot', 'quick_create', 'lark_chat', 'slack_chat', 'issue_sync'));
