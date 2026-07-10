@@ -1086,6 +1086,39 @@ func hostFromURL(raw string) string {
 	return strings.ToLower(raw)
 }
 
+// repoIdentityFromURL returns lowercased "host/owner/name" from an https, scp
+// ssh (git@host:owner/name) or ssh:// git URL, or "" if it can't. Used to
+// match workspace.repos entries against a GitLab connection's instance when
+// auto-registering project webhooks.
+func repoIdentityFromURL(raw string) string {
+	s := strings.ToLower(strings.TrimSpace(raw))
+	if s == "" {
+		return ""
+	}
+	// Trim trailing slashes before ".git" so "…/foo.git/" resolves.
+	s = strings.TrimRight(s, "/")
+	s = strings.TrimSuffix(s, ".git")
+	s = strings.TrimRight(s, "/")
+	if i := strings.Index(s, "://"); i >= 0 {
+		s = s[i+3:]
+	}
+	if i := strings.Index(s, "@"); i >= 0 {
+		s = s[i+1:]
+	}
+	// Fold scp-like "host:owner/name" into a path so one split handles all forms.
+	s = strings.ReplaceAll(s, ":", "/")
+	segments := make([]string, 0, 4)
+	for _, seg := range strings.Split(s, "/") {
+		if seg != "" {
+			segments = append(segments, seg)
+		}
+	}
+	if len(segments) < 3 {
+		return ""
+	}
+	return segments[0] + "/" + segments[len(segments)-2] + "/" + segments[len(segments)-1]
+}
+
 func strToTextOrNull(s string) pgtype.Text {
 	return ptrToText(strPtrOrNil(s))
 }

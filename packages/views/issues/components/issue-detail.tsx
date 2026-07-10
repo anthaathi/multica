@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "react";
-import { Virtuoso } from "react-virtuoso";
+import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import { useDefaultLayout, usePanelRef } from "react-resizable-panels";
 import { AppLink } from "../../navigation";
 import { useNavigation } from "../../navigation";
@@ -58,6 +58,7 @@ import { LocalDirectoryHint } from "../../projects/components/local-directory-hi
 import { CommentCard } from "./comment-card";
 import { CommentInput } from "./comment-input";
 import { ResolvedThreadBar } from "./resolved-thread-bar";
+import { ThreadMinimap, type ThreadMinimapThread } from "./thread-minimap";
 import { collectThreadReplies, deriveThreadResolution } from "./thread-utils";
 import { IssueAgentHeaderChip } from "./issue-agent-header-chip";
 import { ExecutionLogSection } from "./execution-log-section";
@@ -152,7 +153,7 @@ function SubscriberPopoverContent({
                     className="flex items-center gap-2.5"
                   >
                     <Checkbox checked={isSubbed} className="pointer-events-none" />
-                    <ActorAvatar actorType="member" actorId={m.user_id} size={22} />
+                    <ActorAvatar actorType="member" actorId={m.user_id} size="md" />
                     <span className="truncate flex-1">{m.name}</span>
                   </CommandItem>
                 );
@@ -171,7 +172,7 @@ function SubscriberPopoverContent({
                     className="flex items-center gap-2.5"
                   >
                     <Checkbox checked={isSubbed} className="pointer-events-none" />
-                    <ActorAvatar actorType="agent" actorId={a.id} size={22} showStatusDot />
+                    <ActorAvatar actorType="agent" actorId={a.id} size="md" showStatusDot />
                     <span className="truncate flex-1">{a.name}</span>
                   </CommandItem>
                 );
@@ -534,7 +535,7 @@ function ActivityBlock({
         } else if (isDueDateChange) {
           leadIcon = <Calendar className="h-4 w-4 shrink-0 text-muted-foreground" />;
         } else {
-          leadIcon = <ActorAvatar actorType={entry.actor_type} actorId={entry.actor_id} size={16} />;
+          leadIcon = <ActorAvatar actorType={entry.actor_type} actorId={entry.actor_id} size="sm" />;
         }
 
         return (
@@ -666,7 +667,7 @@ function SubIssueRow({ child }: { child: Issue }) {
             <ActorAvatar
               actorType={child.assignee_type}
               actorId={child.assignee_id}
-              size={20}
+              size="sm"
               className="shrink-0"
             />
           ) : (
@@ -1082,6 +1083,59 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
     if (!rootId) return -1;
     return items.findIndex((it) => it.id === rootId);
   }, [items, highlightCommentId, replyToRoot]);
+
+  // Quick-jump minimap rail: one tick per comment thread (folded resolved
+  // bars included), activity groups skipped. Derived from the same flat
+  // `items` array Virtuoso renders so tick order always matches the page.
+  const minimapThreads = useMemo<ThreadMinimapThread[]>(
+    () =>
+      items.flatMap((it) =>
+        it.kind === "comment" || it.kind === "resolved-bar"
+          ? [{ id: it.id, entry: it.entry }]
+          : [],
+      ),
+    [items],
+  );
+
+  // When the timeline renders flat (deep-link or in-page find), there is no
+  // Virtuoso instance — minimap jumps drive the scroll container directly.
+  const isFlatTimeline = !!highlightCommentId || find.open;
+  const virtuosoRef = useRef<VirtuosoHandle>(null);
+  const jumpFlashTimerRef = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (jumpFlashTimerRef.current !== null) window.clearTimeout(jumpFlashTimerRef.current);
+    },
+    [],
+  );
+  const jumpToThread = useCallback(
+    (threadId: string) => {
+      if (isFlatTimeline) {
+        // Flat mode mounts every row, so the anchor is always in the DOM.
+        // Drive the container's scrollTop directly — never native
+        // scrollIntoView, which also scrolls the desktop shell (#3929).
+        const el = document.getElementById(`comment-${threadId}`);
+        const container = scrollContainerEl;
+        if (!el || !container) return;
+        const c = container.getBoundingClientRect();
+        const e = el.getBoundingClientRect();
+        container.scrollTop = Math.max(0, container.scrollTop + (e.top - c.top) - 16);
+      } else {
+        // Virtualized mode: the target row may not be mounted, so scroll by
+        // index and let Virtuoso mount it. Offset leaves a small top gap.
+        const index = items.findIndex((it) => it.id === threadId);
+        if (index < 0) return;
+        virtuosoRef.current?.scrollToIndex({ index, align: "start", offset: -16 });
+      }
+      // Flash the landed thread the same way inbox deep-links do, so the eye
+      // has an anchor after the instant jump. (Folded resolved bars don't
+      // take the highlight prop — the scroll itself is the feedback there.)
+      setHighlightedId(threadId);
+      if (jumpFlashTimerRef.current !== null) window.clearTimeout(jumpFlashTimerRef.current);
+      jumpFlashTimerRef.current = window.setTimeout(() => setHighlightedId(null), 2000);
+    },
+    [isFlatTimeline, items, scrollContainerEl],
+  );
 
   const {
     reactions: issueReactions,
@@ -1628,7 +1682,7 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
         </button>
         {detailsOpen && <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 pl-2">
           <PropRow label={t(($) => $.detail.prop_created_by)}>
-            <ActorAvatar actorType={issue.creator_type} actorId={issue.creator_id} size={18} enableHoverCard />
+            <ActorAvatar actorType={issue.creator_type} actorId={issue.creator_id} size="sm" enableHoverCard />
             <span className="cursor-pointer truncate">{getActorName(issue.creator_type, issue.creator_id)}</span>
           </PropRow>
           <PropRow label={t(($) => $.detail.prop_created)}>
@@ -2130,7 +2184,7 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
                             key={`${sub.user_type}-${sub.user_id}`}
                             actorType={sub.user_type}
                             actorId={sub.user_id}
-                            size={24}
+                            size="md"
                             enableHoverCard
                           />
                         ))}
@@ -2205,6 +2259,7 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
                   <div className="mt-4">
                     <Virtuoso
                       key={`${wsId}:${id}`}
+                      ref={virtuosoRef}
                       customScrollParent={scrollContainerEl}
                       data={items}
                       increaseViewportBy={{ top: 800, bottom: 800 }}
@@ -2241,6 +2296,19 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
           </div>
         </div>
         </div>
+
+        {/* Thread quick-jump rail — overlays the scroll container's left
+            gutter (inside the px-8 content padding, so it never covers
+            text). Hover previews a thread, click jumps to it. Hidden on
+            mobile: no hover, and the gutter is too tight. */}
+        {!isMobile && (
+          <ThreadMinimap
+            threads={minimapThreads}
+            scrollContainerEl={scrollContainerEl}
+            onJump={jumpToThread}
+            className="absolute bottom-0 left-2 top-12"
+          />
+        )}
       </div>
   );
 

@@ -1,5 +1,7 @@
 -- Reconcile issue.origin_type CHECK constraint to the full union of values
--- across upstream and the fork.
+-- across upstream and the fork. Renumbered from 157 -> 161 after upstream
+-- claimed prefix 157 (157_agent_task_delivered_comments); runs last so the
+-- union survives regardless of which same-prefix 149 migration ran.
 --
 -- Two prefix-149 migrations each redefined issue_origin_type_check with a
 -- hardcoded list, and they run in sorted-filename order:

@@ -143,6 +143,7 @@ export function AgentDetailInspector({
         <ThinkingPropRow
           runtimeId={agent.runtime_id}
           runtimeOnline={!!isOnline}
+          provider={runtime?.provider ?? ""}
           model={agent.model ?? ""}
           value={agent.thinking_level ?? ""}
           canEdit={canEdit}
@@ -184,7 +185,7 @@ export function AgentDetailInspector({
               <ActorAvatar
                 actorType="member"
                 actorId={owner.user_id}
-                size={14}
+                size="xs"
               />
               <span className="truncate">{owner.name}</span>
             </span>
@@ -301,13 +302,8 @@ function AvatarEditor({
 }) {
   if (!canEdit) {
     return (
-      <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg">
-        <ActorAvatar
-          actorType="agent"
-          actorId={agent.id}
-          size={56}
-          className="rounded-none"
-        />
+      <div className="h-14 w-14 shrink-0 overflow-hidden rounded-full">
+        <ActorAvatar actorType="agent" actorId={agent.id} size="2xl" />
       </div>
     );
   }
