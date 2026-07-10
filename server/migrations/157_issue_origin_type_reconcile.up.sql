@@ -1,0 +1,19 @@
+-- Reconcile issue.origin_type CHECK constraint to the full union of values
+-- across upstream and the fork.
+--
+-- Two prefix-149 migrations each redefined issue_origin_type_check with a
+-- hardcoded list, and they run in sorted-filename order:
+--   149_issue_origin_agent_create   (upstream) -> adds 'agent_create'
+--   149_issue_origin_mattermost_chat (fork)     -> re-adds the constraint with
+--       the fork's own values ('issue_sync', 'mattermost_chat') but WITHOUT
+--       'agent_create' (it predated the upstream change), so the fork's 149
+--       ran second and dropped 'agent_create'.
+-- The result rejected origin_type='agent_create', breaking agent-created
+-- issues (MUL-4305). This forward-only migration restores the complete value
+-- set so agent-created issues are accepted alongside the fork's issue_sync /
+-- mattermost_chat origins. Idempotent: re-establishes the constraint with the
+-- union regardless of which 149 ran last, so it is correct on both fresh and
+-- already-migrated databases.
+ALTER TABLE issue DROP CONSTRAINT IF EXISTS issue_origin_type_check;
+ALTER TABLE issue ADD CONSTRAINT issue_origin_type_check
+    CHECK (origin_type IN ('autopilot', 'quick_create', 'lark_chat', 'slack_chat', 'agent_create', 'issue_sync', 'mattermost_chat'));
