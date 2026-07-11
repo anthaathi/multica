@@ -443,13 +443,16 @@ func (e *Engine) syncLabels(ctx context.Context, issue db.Issue, remoteLabels []
 		}
 	}
 	if len(want) > 0 {
-		all, err := e.Queries.ListLabels(ctx, issue.WorkspaceID)
+		all, err := e.Queries.ListLabels(ctx, db.ListLabelsParams{
+			WorkspaceID:  issue.WorkspaceID,
+			ResourceType: "issue",
+		})
 		if err != nil {
 			return err
 		}
-		byName := make(map[string]db.IssueLabel, len(all))
+		byName := make(map[string]pgtype.UUID, len(all))
 		for _, l := range all {
-			byName[strings.ToLower(l.Name)] = l
+			byName[strings.ToLower(l.Name)] = l.ID
 		}
 		for _, raw := range remoteLabels {
 			name := strings.TrimSpace(raw)
@@ -460,21 +463,24 @@ func (e *Engine) syncLabels(ctx context.Context, issue db.Issue, remoteLabels []
 			if _, attached := have[lower]; attached {
 				continue
 			}
-			label, exists := byName[lower]
+			labelID, exists := byName[lower]
 			if !exists {
-				label, err = e.Queries.CreateLabel(ctx, db.CreateLabelParams{
-					WorkspaceID: issue.WorkspaceID,
-					Name:        name,
-					Color:       "#6b7280",
+				created, createErr := e.Queries.CreateLabel(ctx, db.CreateLabelParams{
+					WorkspaceID:  issue.WorkspaceID,
+					ResourceType: "issue",
+					Name:         name,
+					Description:  "",
+					Color:        "#6b7280",
 				})
-				if err != nil {
-					return err
+				if createErr != nil {
+					return createErr
 				}
-				byName[lower] = label
+				labelID = created.ID
+				byName[lower] = labelID
 			}
 			if err := e.Queries.AttachLabelToIssue(ctx, db.AttachLabelToIssueParams{
 				IssueID:     issue.ID,
-				LabelID:     label.ID,
+				LabelID:     labelID,
 				WorkspaceID: issue.WorkspaceID,
 			}); err != nil {
 				return err
