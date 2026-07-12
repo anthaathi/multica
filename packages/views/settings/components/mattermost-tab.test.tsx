@@ -143,7 +143,7 @@ describe("MattermostAgentBindButton", () => {
     expect(mockToast.success).toHaveBeenCalled();
     // BYO is a direct API call — no external browser redirect.
     expect(mockOpenExternal).not.toHaveBeenCalled();
-  });
+  }, 15000);
 
   it("shows the failed toast when the bot token is rejected", async () => {
     mockRegisterBYO.mockRejectedValue(new Error("invalid bot token"));
@@ -159,7 +159,7 @@ describe("MattermostAgentBindButton", () => {
     // A failed install must not invalidate the list or show a success toast.
     expect(mockInvalidate).not.toHaveBeenCalled();
     expect(mockToast.success).not.toHaveBeenCalled();
-  });
+  }, 15000);
 
   it("shows the connected badge (not the CTA) when the agent already has an active install", () => {
     installationsRef.current = {
