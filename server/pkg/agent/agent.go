@@ -1,7 +1,7 @@
 // Package agent provides a unified interface for executing prompts via
-// coding agents (Claude Code, CodeBuddy, Codex, Copilot, OpenCode, OpenClaw,
-// Hermes, Pi, Cursor, Kimi, Kiro, Antigravity, Qoder, Trae, Oh My Pi). It
-// mirrors the happy-cli AgentBackend pattern, translated to idiomatic Go.
+// coding agents (Claude Code, CodeBuddy, Codex, Copilot, OpenCode, DevEco Code,
+// OpenClaw, Hermes, Pi, Cursor, Kimi, Kiro, Antigravity, Qoder, Trae, Oh My Pi).
+// It mirrors the happy-cli AgentBackend pattern, translated to idiomatic Go.
 package agent
 
 import (
@@ -36,10 +36,17 @@ type ExecOptions struct {
 	// protocol transport. It is currently consumed by Codex app-server;
 	// zero uses the provider default rather than disabling the bound.
 	HandshakeTimeout time.Duration
-	ResumeSessionID  string          // if non-empty, resume a previous agent session
-	ExtraArgs        []string        // daemon-wide default CLI arguments appended before CustomArgs; currently read by claude and codex backends only
-	CustomArgs       []string        // per-agent CLI arguments appended after ExtraArgs
-	McpConfig        json.RawMessage // if non-nil, MCP server config to pass via --mcp-config
+	ResumeSessionID  string // if non-empty, resume a previous agent session
+	// ResumeExpected records that this task intended to continue a prior
+	// conversation, independent of ResumeSessionID (which a fallback retry may
+	// clear). When it is true but the backend ends up on a fresh thread — the
+	// live resume RPC was rejected, or a transport failure forced a fresh retry —
+	// the backend surfaces a continuity notice to the user instead of silently
+	// restarting. Currently honoured by the codex backend (MUL-4424).
+	ResumeExpected bool
+	ExtraArgs      []string        // daemon-wide default CLI arguments appended before CustomArgs; currently read by claude and codex backends only
+	CustomArgs     []string        // per-agent CLI arguments appended after ExtraArgs
+	McpConfig      json.RawMessage // if non-nil, MCP server config to pass via --mcp-config
 	// ThinkingLevel is the runtime-native reasoning/effort value (e.g.
 	// Claude's "low|medium|high|xhigh|max", Codex's "none|minimal|low|
 	// medium|high|xhigh", OpenCode's model variant names). Empty means
@@ -137,14 +144,14 @@ type Config struct {
 }
 
 // New creates a Backend for the given agent type.
-// Supported types: "claude", "codebuddy", "codex", "copilot", "opencode", "openclaw", "hermes", "pi", "cursor", "kimi", "kiro", "antigravity", "qoder", "traecli", "omp".
+// Supported types: "claude", "codebuddy", "codex", "copilot", "opencode", "deveco", "openclaw", "hermes", "pi", "cursor", "kimi", "kiro", "antigravity", "qoder", "traecli", "omp".
 //
 // SupportedTypes is the canonical whitelist of agent types eligible to back a
 // custom runtime profile. It MUST stay in lockstep with the
 // runtime_profile.protocol_family CHECK constraint (migration 120, widened by
-// migration 134 to add qoder, migration 136 to add traecli, and migration 143
-// to add omp): a custom runtime profile may only be based on a backend
-// Multica officially supports.
+// migration 134 to add qoder, migration 136 to add traecli, migration 143
+// to add omp, and migration 175 to add deveco): a custom runtime profile may
+// only be based on a backend Multica officially supports.
 // qoder is exposed here so Qoder CN (`qoderclicn`) users can point the Qoder
 // backend at a non-default binary instead of misrouting through Kiro/ACP with
 // incompatible arguments (#4883). traecli (Trae) has a New backend, launch
@@ -158,6 +165,7 @@ var SupportedTypes = []string{
 	"codex",
 	"copilot",
 	"opencode",
+	"deveco",
 	"openclaw",
 	"hermes",
 	"pi",
@@ -198,6 +206,8 @@ func New(agentType string, cfg Config) (Backend, error) {
 		return &copilotBackend{cfg: cfg}, nil
 	case "opencode":
 		return &opencodeBackend{cfg: cfg}, nil
+	case "deveco":
+		return &devecoBackend{cfg: cfg}, nil
 	case "openclaw":
 		return &openclawBackend{cfg: cfg}, nil
 	case "hermes":
@@ -219,7 +229,7 @@ func New(agentType string, cfg Config) (Backend, error) {
 	case "omp":
 		return &ompBackend{cfg: cfg}, nil
 	default:
-		return nil, fmt.Errorf("unknown agent type: %q (supported: claude, codebuddy, codex, copilot, opencode, openclaw, hermes, pi, cursor, kimi, kiro, antigravity, qoder, traecli, omp)", agentType)
+		return nil, fmt.Errorf("unknown agent type: %q (supported: claude, codebuddy, codex, copilot, opencode, deveco, openclaw, hermes, pi, cursor, kimi, kiro, antigravity, qoder, traecli, omp)", agentType)
 	}
 }
 
@@ -241,6 +251,7 @@ var launchHeaders = map[string]string{
 	"codex":       "codex app-server",
 	"copilot":     "copilot (json)",
 	"cursor":      "cursor-agent (stream-json)",
+	"deveco":      "deveco run (json)",
 	"hermes":      "hermes acp",
 	"kimi":        "kimi acp",
 	"kiro":        "kiro-cli acp",
