@@ -152,13 +152,19 @@ func enqueueIssueOutbox(ctx context.Context, queries *db.Queries, engine *issues
 // enqueueCommentOutbox mirrors a local comment to every source that mirrors
 // the parent issue. The author label (member/agent display name) is resolved
 // here so the outbox worker doesn't re-fetch user rows at dispatch time.
+//
+// Comment payloads arrive in two shapes:
+//   - handler.CommentResponse from the HTTP CreateComment/UpdateComment path
+//   - map[string]any from TaskService.createAgentComment (agent task fallback
+//     and system failure comments). The map form must be accepted or agent
+//     comments never reach external trackers (Jira/GitHub/GitLab).
 func enqueueCommentOutbox(ctx context.Context, queries *db.Queries, engine *issuesync.Engine, e events.Event) {
 	payload, ok := e.Payload.(map[string]any)
 	if !ok {
 		return
 	}
-	comment, ok := payload["comment"].(handler.CommentResponse)
-	if !ok || comment.ID == "" {
+	comment, ok := extractCommentFields(payload["comment"])
+	if !ok {
 		return
 	}
 	issueID, err := util.ParseUUID(comment.IssueID)
@@ -192,6 +198,33 @@ func enqueueCommentOutbox(ctx context.Context, queries *db.Queries, engine *issu
 		}); err != nil {
 			slog.Warn("issuesync listener: enqueue push_comment failed", "error", err)
 		}
+	}
+}
+
+// extractCommentFields normalizes a comment payload that may be either a
+// handler.CommentResponse (HTTP path) or a map[string]any (TaskService
+// createAgentComment path) into the fields needed for outbound enqueue.
+func extractCommentFields(v any) (handler.CommentResponse, bool) {
+	switch c := v.(type) {
+	case handler.CommentResponse:
+		if c.ID == "" || c.IssueID == "" {
+			return handler.CommentResponse{}, false
+		}
+		return c, true
+	case map[string]any:
+		comment := handler.CommentResponse{}
+		comment.ID, _ = c["id"].(string)
+		comment.IssueID, _ = c["issue_id"].(string)
+		comment.AuthorType, _ = c["author_type"].(string)
+		comment.AuthorID, _ = c["author_id"].(string)
+		comment.Content, _ = c["content"].(string)
+		comment.Type, _ = c["type"].(string)
+		if comment.ID == "" || comment.IssueID == "" {
+			return handler.CommentResponse{}, false
+		}
+		return comment, true
+	default:
+		return handler.CommentResponse{}, false
 	}
 }
 
