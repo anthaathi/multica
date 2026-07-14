@@ -8,6 +8,12 @@
 -- Mirrors the quick_create link (060) — same origin_id semantics (an
 -- agent_task_queue row), different label because this is the normal create path
 -- rather than the daemon quick-create flow.
+-- NOTE: the CHECK list below includes the fork's 'issue_sync' (136) and
+-- 'mattermost_chat' (149_issue_origin_mattermost_chat) in addition to the
+-- upstream values. Without them this migration crashes on fork databases
+-- that already have rows with those origins (SQLSTATE 23514). Migration 175
+-- re-establishes the canonical union constraint regardless, but this
+-- intermediate definition must tolerate existing fork data to run at all.
 ALTER TABLE issue DROP CONSTRAINT IF EXISTS issue_origin_type_check;
 ALTER TABLE issue ADD CONSTRAINT issue_origin_type_check
-    CHECK (origin_type IN ('autopilot', 'quick_create', 'lark_chat', 'slack_chat', 'agent_create'));
+    CHECK (origin_type IN ('autopilot', 'quick_create', 'lark_chat', 'slack_chat', 'agent_create', 'issue_sync', 'mattermost_chat'));
