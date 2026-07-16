@@ -120,6 +120,7 @@ export const RUNTIME_PROFILE_PROTOCOL_FAMILIES = [
   "qoder",
   "traecli",
   "omp",
+  "grok",
 ] as const;
 
 export type RuntimeProtocolFamily =

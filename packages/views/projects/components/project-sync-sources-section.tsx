@@ -354,6 +354,7 @@ function AddSyncSourceDialog({
           <div className="space-y-1">
             <Label className="text-xs">{t(($) => $.sync_sources.step_provider)}</Label>
             <Select
+              items={PROVIDERS.map((p) => ({ value: p, label: t(($) => $.sync_sources[`provider_${p}` as keyof typeof $.sync_sources] as string) }))}
               value={provider}
               onValueChange={(next) => {
                 setProvider((next as SyncProvider) ?? "");
@@ -384,6 +385,7 @@ function AddSyncSourceDialog({
                 </p>
               ) : (
                 <Select
+                  items={connections.map((c) => ({ value: c.id, label: c.label }))}
                   value={connectionId}
                   onValueChange={(next) => {
                     setConnectionId(next ?? "");
@@ -409,7 +411,11 @@ function AddSyncSourceDialog({
           {provider && connectionId && (
             <div className="space-y-1">
               <Label className="text-xs">{t(($) => $.sync_sources.step_container)}</Label>
-              <Select value={containerKey} onValueChange={(next) => setContainerKey(next ?? "")}>
+              <Select
+                items={(containers.data ?? []).map((c) => ({ value: c.key, label: c.name || c.key }))}
+                value={containerKey}
+                onValueChange={(next) => setContainerKey(next ?? "")}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder={t(($) => $.sync_sources.container_placeholder)} />
                   {selectedContainer?.url && (

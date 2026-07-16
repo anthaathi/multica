@@ -152,6 +152,7 @@ The daemon auto-detects these AI CLIs on your PATH:
 | [Qoder CLI](https://docs.qoder.com/) | `qodercli` | Qoder ACP coding agent |
 | [Trae](https://docs.trae.cn/cli) | `traecli` | ByteDance TRAE CLI (ACP via `traecli acp serve`) |
 | [Oh My Pi](https://omp.sh/) | `omp` | Oh My Pi coding agent (Pi fork; JSON event stream via `omp -p --mode json`) |
+| [Grok Build CLI](https://docs.x.ai/) | `grok` | xAI Grok Build CLI (ACP via `grok agent stdio`) |
 
 You need at least one installed. The daemon registers each detected CLI as an available runtime.
 
@@ -229,6 +230,8 @@ Agent-specific overrides:
 | `MULTICA_TRAECLI_MODEL` | Override the Trae model used (a model id from your logged-in traecli catalog, e.g. `Doubao-Seed-2.1-Pro`) |
 | `MULTICA_OMP_PATH` | Custom path to the `omp` binary |
 | `MULTICA_OMP_MODEL` | Override the Oh My Pi model used (a `provider/id` selector from `omp models --json`) |
+| `MULTICA_GROK_PATH` | Custom path to the `grok` binary (defaults to `grok` on PATH; often `~/.grok/bin/grok`) |
+| `MULTICA_GROK_MODEL` | Override the Grok model used (e.g. `grok-4.5`) |
 
 If a previously generated `~/.multica/hooks` wrapper is first on `PATH` and calls the same command name again, the daemon skips that hooks directory during built-in agent discovery and records the real binary path behind it. If your interactive shell still recurses when you run `claude`, `codex`, or `hermes` manually, remove the hooks entry from your shell startup file or replace the wrapper body with an absolute `exec /path/to/real-binary "$@"`.
 

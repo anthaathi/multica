@@ -1,5 +1,6 @@
 import type { Label } from "./label";
 import type { IssueSyncLink } from "./issue-sync";
+import type { IssuePropertyValues } from "./property";
 
 export type IssueStatus =
   | "backlog"
@@ -59,6 +60,9 @@ export interface Issue {
   start_date: string | null;
   due_date: string | null;
   metadata: IssueMetadata;
+  // Custom property values keyed by property definition id. Always present
+  // in responses (empty object when unset), mirroring `metadata`.
+  properties: IssuePropertyValues;
   reactions?: IssueReaction[];
   labels?: Label[];
   sync_links?: IssueSyncLink[];

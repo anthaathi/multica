@@ -3468,6 +3468,7 @@ func gcMetaForTask(task Task) (execenv.GCMeta, bool) {
 var runtimeDisplayNameOverrides = map[string]string{
 	"traecli": "Trae",
 	"omp":     "Oh My Pi",
+	"grok":    "Grok",
 }
 
 // providerDisplayName returns the human-facing runtime name for a provider key.
