@@ -239,7 +239,7 @@ func (e *Engine) createLocalIssue(ctx context.Context, src db.IssueSyncSource, r
 		AllowDuplicate: true,
 	}, service.IssueCreateOpts{
 		ActorType: ActorTypeSync,
-		BroadcastPayload: func(issue db.Issue, _ []db.Attachment) map[string]any {
+		BroadcastPayload: func(issue db.Issue, _ []db.Attachment, _ []db.IssueLabel) map[string]any {
 			return e.issuePayload(ctx, issue)
 		},
 	})

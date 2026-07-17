@@ -215,6 +215,8 @@ export function AgentTranscriptDialog({
     () => (sortDirection === "newest_first" ? [...filteredNodes].reverse() : filteredNodes),
     [filteredNodes, sortDirection],
   );
+  const isAntigravityLiveEmpty =
+    isLive && displayNodes.length === 0 && runtimeInfo?.provider === "antigravity";
 
   // Tool-card keys (the only expandable node kind).
   const expandableKeys = useMemo(
@@ -625,7 +627,12 @@ export function AgentTranscriptDialog({
         {/* ── Conversation list ─────────────────────────────────── */}
         {displayNodes.length === 0 ? (
           <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-            {isLive ? (
+            {isAntigravityLiveEmpty ? (
+              <div className="flex max-w-md items-center gap-2 px-4 text-center">
+                <Clock className="h-4 w-4 shrink-0" />
+                {t(($) => $.transcript.antigravity_live_unavailable)}
+              </div>
+            ) : isLive ? (
               <div className="flex items-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 {t(($) => $.transcript.waiting_events)}
