@@ -41,7 +41,6 @@ func TestQuickCreateIssueParentTrustBoundary(t *testing.T) {
 		t.Fatalf("fetch agent: %v", err)
 	}
 
-
 	// Same-workspace parent — must be accepted and threaded through.
 	var localParentID string
 	if err := testPool.QueryRow(ctx, `

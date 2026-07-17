@@ -23,6 +23,7 @@ import (
 	"github.com/multica-ai/multica/server/internal/middleware"
 	"github.com/multica-ai/multica/server/internal/service"
 	"github.com/multica-ai/multica/server/internal/util"
+
 	db "github.com/multica-ai/multica/server/pkg/db/generated"
 	"github.com/multica-ai/multica/server/pkg/protocol"
 )
@@ -75,9 +76,9 @@ type IssueResponse struct {
 
 // IssueSyncLinkResponse is the JSON shape for one external sync link on an issue.
 type IssueSyncLinkResponse struct {
-	Provider    string `json:"provider"`
-	ExternalKey string `json:"external_key"`
-	WebURL      string `json:"web_url"`
+	Provider    string  `json:"provider"`
+	ExternalKey string  `json:"external_key"`
+	WebURL      string  `json:"web_url"`
 	SyncError   *string `json:"sync_error,omitempty"`
 }
 
@@ -765,6 +766,26 @@ func (h *Handler) SearchIssues(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// QueryIssues is the POST twin of ListIssues for filter sets too large for a
+// GET request line — the table's agents-working facet can carry hundreds of
+// issue ids, and common reverse proxies cap request lines around 8 KB. The
+// body is a flat JSON object with EXACTLY the same keys and string encodings
+// as ListIssues' query parameters; the handler rebuilds the query string and
+// delegates, so the two transports cannot drift.
+func (h *Handler) QueryIssues(w http.ResponseWriter, r *http.Request) {
+	var params map[string]string
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&params); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	values := make(url.Values, len(params))
+	for key, value := range params {
+		values.Set(key, value)
+	}
+	r.URL.RawQuery = values.Encode()
+	h.ListIssues(w, r)
+}
+
 func (h *Handler) ListIssues(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -912,9 +933,13 @@ func (h *Handler) ListIssues(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	var statusFilter pgtype.Text
-	if s := r.URL.Query().Get("status"); s != "" {
-		statusFilter = pgtype.Text{String: s, Valid: true}
+	statusesFilter := splitCommaParam(r.URL.Query().Get("statuses"))
+	if len(statusesFilter) == 0 {
+		statusesFilter = splitCommaParam(r.URL.Query().Get("status"))
+	}
+	prioritiesFilter := splitCommaParam(r.URL.Query().Get("priorities"))
+	if len(prioritiesFilter) == 0 {
+		prioritiesFilter = splitCommaParam(r.URL.Query().Get("priority"))
 	}
 
 	// assignee_types narrows the list to issues assigned to the given actor
@@ -946,8 +971,11 @@ func (h *Handler) ListIssues(w http.ResponseWriter, r *http.Request) {
 	sortIsProperty := false
 	if s := r.URL.Query().Get("sort"); s != "" {
 		switch s {
-		case "position", "title", "created_at", "start_date", "due_date":
+		case "position", "title", "created_at", "updated_at", "start_date", "due_date":
 			sortCol = s
+		case "status":
+			sortCol = "CASE i.status WHEN 'backlog' THEN 0 WHEN 'todo' THEN 1 WHEN 'in_progress' THEN 2 WHEN 'in_review' THEN 3 WHEN 'done' THEN 4 WHEN 'blocked' THEN 5 WHEN 'cancelled' THEN 6 ELSE 7 END"
+			sortIsExpr = true
 		case "priority":
 			sortCol = "CASE i.priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END"
 			sortIsExpr = true
@@ -999,11 +1027,11 @@ func (h *Handler) ListIssues(w http.ResponseWriter, r *http.Request) {
 		return "$" + strconv.Itoa(len(args))
 	}
 
-	if statusFilter.Valid {
-		where = append(where, fmt.Sprintf("i.status = %s", addArg(statusFilter.String)))
+	if len(statusesFilter) > 0 {
+		where = append(where, fmt.Sprintf("i.status = ANY(%s::text[])", addArg(statusesFilter)))
 	}
-	if priorityFilter.Valid {
-		where = append(where, fmt.Sprintf("i.priority = %s", addArg(priorityFilter.String)))
+	if len(prioritiesFilter) > 0 {
+		where = append(where, fmt.Sprintf("i.priority = ANY(%s::text[])", addArg(prioritiesFilter)))
 	}
 	if assigneeFilter.Valid {
 		where = append(where, fmt.Sprintf("i.assignee_id = %s::uuid", addArg(assigneeFilter)))
@@ -1020,6 +1048,90 @@ func (h *Handler) ListIssues(w http.ResponseWriter, r *http.Request) {
 	if projectFilter.Valid {
 		where = append(where, fmt.Sprintf("i.project_id = %s::uuid", addArg(projectFilter)))
 	}
+
+	// Table facets must be part of the server window. Applying them after
+	// LIMIT/OFFSET hides matches that live on later pages and makes `total`
+	// disagree with the rows the user sees/exports.
+	assigneeFilters, ok := parseActorFilterList(w, r.URL.Query().Get("assignee_filters"), "assignee_filters")
+	if !ok {
+		return
+	}
+	includeNoAssignee := r.URL.Query().Get("include_no_assignee") == "true"
+	if len(assigneeFilters) > 0 || includeNoAssignee {
+		ors := make([]string, 0, len(assigneeFilters)+1)
+		for _, filter := range assigneeFilters {
+			ors = append(ors, fmt.Sprintf(
+				"(i.assignee_type = %s::text AND i.assignee_id = %s::uuid)",
+				addArg(filter.actorType),
+				addArg(filter.actorID),
+			))
+		}
+		if includeNoAssignee {
+			ors = append(ors, "(i.assignee_type IS NULL AND i.assignee_id IS NULL)")
+		}
+		where = append(where, "("+strings.Join(ors, " OR ")+")")
+	}
+
+	creatorFilters, ok := parseActorFilterList(w, r.URL.Query().Get("creator_filters"), "creator_filters")
+	if !ok {
+		return
+	}
+	if len(creatorFilters) > 0 {
+		ors := make([]string, 0, len(creatorFilters))
+		for _, filter := range creatorFilters {
+			ors = append(ors, fmt.Sprintf(
+				"(i.creator_type = %s::text AND i.creator_id = %s::uuid)",
+				addArg(filter.actorType),
+				addArg(filter.actorID),
+			))
+		}
+		where = append(where, "("+strings.Join(ors, " OR ")+")")
+	}
+
+	projectIDs, ok := parseUUIDParamList(w, r.URL.Query().Get("project_ids"), "project_ids")
+	if !ok {
+		return
+	}
+	includeNoProject := r.URL.Query().Get("include_no_project") == "true"
+	if len(projectIDs) > 0 || includeNoProject {
+		ors := make([]string, 0, 2)
+		if len(projectIDs) > 0 {
+			ors = append(ors, fmt.Sprintf("i.project_id = ANY(%s::uuid[])", addArg(projectIDs)))
+		}
+		if includeNoProject {
+			ors = append(ors, "i.project_id IS NULL")
+		}
+		where = append(where, "("+strings.Join(ors, " OR ")+")")
+	}
+
+	labelIDs, ok := parseUUIDParamList(w, r.URL.Query().Get("label_ids"), "label_ids")
+	if !ok {
+		return
+	}
+	if len(labelIDs) > 0 {
+		where = append(where, fmt.Sprintf(
+			"EXISTS (SELECT 1 FROM issue_to_label itl WHERE itl.issue_id = i.id AND itl.label_id = ANY(%s::uuid[]))",
+			addArg(labelIDs),
+		))
+	}
+	// ids restricts the window to an explicit id set (the table's
+	// agents-working facet sends the live running-issue ids). Presence with an
+	// EMPTY list is meaningful — it must yield an empty window, not degrade to
+	// the unrestricted one, so gate on Has() rather than the parsed length.
+	if r.URL.Query().Has("ids") {
+		idsFilter, ok := parseUUIDParamList(w, r.URL.Query().Get("ids"), "ids")
+		if !ok {
+			return
+		}
+		if idsFilter == nil {
+			idsFilter = []pgtype.UUID{}
+		}
+		where = append(where, fmt.Sprintf("i.id = ANY(%s::uuid[])", addArg(idsFilter)))
+	}
+	if r.URL.Query().Get("top_level_only") == "true" {
+		where = append(where, "i.parent_issue_id IS NULL")
+	}
+	where = appendIssueTableSearchFilter(where, addArg, r.URL.Query().Get("q"))
 	if scheduledFilter.Valid {
 		where = append(where, "(i.start_date IS NOT NULL OR i.due_date IS NOT NULL)")
 	}
@@ -1078,7 +1190,10 @@ func (h *Handler) ListIssues(w http.ResponseWriter, r *http.Request) {
 		// directions (mirrors the client comparator).
 		orderBy += " NULLS LAST"
 	}
-	orderBy += ", i.created_at DESC"
+	// created_at alone is not unique (bulk imports share timestamps); without
+	// a unique final key the database may reorder ties between two
+	// LIMIT/OFFSET requests, duplicating or dropping rows at page boundaries.
+	orderBy += ", i.created_at DESC, i.id DESC"
 
 	offsetRef := addArg(int64(offset))
 	limitRef := addArg(int64(limit))
@@ -1233,6 +1348,36 @@ func appendIssueDateFilter(where []string, addArg func(any) string, filter *issu
 		filter.column,
 		endRef,
 	))
+}
+
+// appendIssueTableSearchFilter adds a quick identity search to the ordinary
+// ListIssues window. Unlike the ranked global search endpoint, this predicate
+// preserves the table's active filters, explicit sort, total, and pagination.
+// Every word must appear in the title; a complete identifier (or bare issue
+// number) also matches the immutable numeric issue number.
+func appendIssueTableSearchFilter(where []string, addArg func(any) string, raw string) []string {
+	query := strings.TrimSpace(raw)
+	if query == "" {
+		return where
+	}
+
+	words := splitSearchTerms(strings.ToLower(query))
+	ors := make([]string, 0, 2)
+	if len(words) > 0 {
+		titleMatches := make([]string, 0, len(words))
+		for _, word := range words {
+			pattern := "%" + escapeLike(word) + "%"
+			titleMatches = append(titleMatches, fmt.Sprintf("LOWER(i.title) LIKE %s", addArg(pattern)))
+		}
+		ors = append(ors, "("+strings.Join(titleMatches, " AND ")+")")
+	}
+	if number, ok := parseQueryNumber(query); ok {
+		ors = append(ors, fmt.Sprintf("i.number = %s", addArg(number)))
+	}
+	if len(ors) == 0 {
+		return where
+	}
+	return append(where, "("+strings.Join(ors, " OR ")+")")
 }
 
 func splitCommaParam(raw string) []string {
@@ -1549,8 +1694,11 @@ func (h *Handler) ListGroupedIssues(w http.ResponseWriter, r *http.Request) {
 	sortIsProperty := false
 	if s := r.URL.Query().Get("sort"); s != "" {
 		switch s {
-		case "position", "title", "created_at", "start_date", "due_date":
+		case "position", "title", "created_at", "updated_at", "start_date", "due_date":
 			sortCol = s
+		case "status":
+			sortCol = "CASE i.status WHEN 'backlog' THEN 0 WHEN 'todo' THEN 1 WHEN 'in_progress' THEN 2 WHEN 'in_review' THEN 3 WHEN 'done' THEN 4 WHEN 'blocked' THEN 5 WHEN 'cancelled' THEN 6 ELSE 7 END"
+			sortIsExpr = true
 		case "priority":
 			sortCol = "CASE i.priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END"
 			sortIsExpr = true
@@ -1602,7 +1750,9 @@ func (h *Handler) ListGroupedIssues(w http.ResponseWriter, r *http.Request) {
 	if sortCol == "start_date" || sortCol == "due_date" || sortIsProperty {
 		intraGroupOrder += " NULLS LAST"
 	}
-	intraGroupOrder += ", i.created_at DESC"
+	// Unique final key — see ListIssues: created_at ties would otherwise make
+	// ROW_NUMBER() unstable across per-group offset pages.
+	intraGroupOrder += ", i.created_at DESC, i.id DESC"
 
 	offsetRef := addArg(int64(offset))
 	limitRef := addArg(int64(limit))
@@ -1933,6 +2083,8 @@ type QuickCreateIssueRequest struct {
 	AgentID       string   `json:"agent_id,omitempty"`
 	SquadID       string   `json:"squad_id,omitempty"`
 	Prompt        string   `json:"prompt"`
+	Priority      string   `json:"priority,omitempty"`
+	DueDate       string   `json:"due_date,omitempty"`
 	ProjectID     string   `json:"project_id,omitempty"`
 	ParentIssueID string   `json:"parent_issue_id,omitempty"`
 	AttachmentIDs []string `json:"attachment_ids,omitempty"`
@@ -1954,6 +2106,20 @@ func (h *Handler) QuickCreateIssue(w http.ResponseWriter, r *http.Request) {
 	if prompt == "" {
 		writeError(w, http.StatusBadRequest, "prompt is required")
 		return
+	}
+	priority := strings.ToLower(strings.TrimSpace(req.Priority))
+	if priority != "" && priority != "urgent" && priority != "high" && priority != "medium" && priority != "low" {
+		writeError(w, http.StatusBadRequest, "priority must be one of: urgent, high, medium, low")
+		return
+	}
+	dueDate := strings.TrimSpace(req.DueDate)
+	if dueDate != "" {
+		parsed, err := util.ParseCalendarDate(dueDate)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "invalid due_date format, expected YYYY-MM-DD")
+			return
+		}
+		dueDate = parsed.Time.Format("2006-01-02")
 	}
 
 	hasAgent := strings.TrimSpace(req.AgentID) != ""
@@ -2095,7 +2261,7 @@ func (h *Handler) QuickCreateIssue(w http.ResponseWriter, r *http.Request) {
 		parentIssueUUID = pid
 	}
 
-	task, err := h.TaskService.EnqueueQuickCreateTask(r.Context(), wsUUID, requesterUUID, agentUUID, squadUUID, prompt, projectUUID, parentIssueUUID, attachmentIDs)
+	task, err := h.TaskService.EnqueueQuickCreateTask(r.Context(), wsUUID, requesterUUID, agentUUID, squadUUID, prompt, priority, dueDate, projectUUID, parentIssueUUID, attachmentIDs)
 	if err != nil {
 		slog.Warn("quick-create enqueue failed", append(logger.RequestAttrs(r), "error", err)...)
 		writeError(w, http.StatusInternalServerError, "failed to enqueue quick-create task")
