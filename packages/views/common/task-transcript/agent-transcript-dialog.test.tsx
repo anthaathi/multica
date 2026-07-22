@@ -23,7 +23,7 @@ vi.mock("../actor-avatar", () => ({
 
 // Real MemoizedMarkdown pulls in shiki (heavy/flaky in jsdom). Render the raw
 // children so text-content assertions stay deterministic.
-vi.mock("../markdown", () => ({
+vi.mock("@multica/ui/markdown", () => ({
   MemoizedMarkdown: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
 

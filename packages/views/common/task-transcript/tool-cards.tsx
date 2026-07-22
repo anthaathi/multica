@@ -25,7 +25,7 @@ import {
 } from "@multica/ui/components/ui/collapsible";
 import { Marker, MarkerIcon, MarkerContent } from "@multica/ui/components/ui/marker";
 import { Bubble, BubbleContent } from "@multica/ui/components/ui/bubble";
-import { MemoizedMarkdown } from "../markdown";
+import { MemoizedMarkdown } from "@multica/ui/markdown";
 import type { ToolNode } from "./conversation";
 import type { TimelineItem } from "./build-timeline";
 import { redactSecrets } from "./redact";
