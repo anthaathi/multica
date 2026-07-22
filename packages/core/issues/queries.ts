@@ -82,8 +82,11 @@ export const issueKeys = {
   /** Resolve a bare issue identifier (e.g. "MUL-123") to an issue. */
   identifier: (wsId: string, identifier: string) =>
     [...issueKeys.all(wsId), "identifier", identifier] as const,
+  /** Prefix for every per-parent children query in a workspace. */
+  childrenAll: (wsId: string) =>
+    [...issueKeys.all(wsId), "children"] as const,
   children: (wsId: string, id: string) =>
-    [...issueKeys.all(wsId), "children", id] as const,
+    [...issueKeys.childrenAll(wsId), id] as const,
   /** Prefix for invalidating all batched-children queries in a workspace. */
   childrenByParentsAll: (wsId: string) =>
     [...issueKeys.all(wsId), "children-by-parents"] as const,
@@ -674,6 +677,12 @@ export function childIssuesOptions(wsId: string, id: string) {
   return queryOptions({
     queryKey: issueKeys.children(wsId, id),
     queryFn: () => api.listChildIssues(id).then((r) => r.issues),
+    // Child creation can happen while this workspace is not the active
+    // realtime subscription (for example, an agent creates it while a
+    // desktop tab is showing another workspace). The global Infinity
+    // staleTime would otherwise reuse an incomplete children snapshot when
+    // the parent is opened again, with no later event guaranteed to heal it.
+    refetchOnMount: "always",
   });
 }
 
