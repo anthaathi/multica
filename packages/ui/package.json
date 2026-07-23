@@ -41,7 +41,7 @@
     "emoji-mart": "^5.6.0",
     "input-otp": "^1.4.2",
     "katex": "catalog:",
-    "linkify-it": "^5.0.0",
+    "linkify-it": "^5.0.2",
     "lucide-react": "catalog:",
     "motion": "^12.38.0",
     "next-themes": "^0.4.6",
