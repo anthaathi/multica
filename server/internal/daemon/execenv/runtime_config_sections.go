@@ -49,14 +49,42 @@ func writeHeader(b *strings.Builder) {
 // notification/reminder", "run the work synchronously instead", the
 // no-background-and-yield rule, the external-work boundary, and the
 // no-"standing by" sign-off rule.
+//
+// MUL-5223: the external-work boundary alone did not stop agents from
+// blocking on CI. Two holes are closed here. First, the boundary was
+// stated as a concept while the section's only concrete "how to wait"
+// example was a blocking foreground call — and `gh pr checks --watch` is
+// exactly that shape, so watching CI read as compliant. Named tool-shape
+// bans replace the inference. Second, the "unless acceptance criteria
+// require it" escape was being satisfied by the repo's own merge
+// requirements ("CI must pass before merge"), so the section now says
+// branch protection is not the agent's acceptance criterion, and gives
+// the replacement hand-off phrasing so the urge to prove quality lands
+// on local test output plus a PR link instead of on a wait.
+//
+// The ban is scoped, not absolute: an explicitly requested CI result is
+// still reachable, and it names the one executable way to collect it
+// (a single foreground blocking watch inside the same turn). Enabling
+// auto-merge is not a wait and stays allowed — only waiting for it to
+// land is banned.
+//
+// Bullet order is deliberate: run-owned rules first, then the
+// external-CI cluster ("The rules above apply only to work owned by the
+// current run" marks the boundary), with the "standing by" ban last so
+// it closes over both. Within the CI cluster the exception bullet must
+// stay below the ban bullet — the ban forward-references "the explicit
+// exception below".
 func writeBackgroundTaskSafetySlim(b *strings.Builder) {
 	b.WriteString("## Background Task Safety\n\n")
 	b.WriteString("Multica marks the task terminal the moment your top-level turn exits — any process, tool call, or subagent owned by this run that is still active is orphaned, its result lost, and the final comment you meant to post after it never sends. There is no background-completion wakeup here.\n\n")
 	b.WriteString("- Do NOT end your turn while background tasks, async subagents, background shell commands, or detached tool calls are still running. Never background-and-yield: never end a turn expecting a future notification or wakeup to resume — it will not arrive.\n")
-	b.WriteString("- This rule applies only to work owned by the current run. External systems triggered by a completed action — for example GitHub Actions after a successful push — are not agent-owned background tasks. Do not wait for them by default; report them as pending and finish the handoff unless the user or acceptance criteria explicitly requires their result.\n")
 	b.WriteString("- When a required result from run-owned work must be collected, wait synchronously inside one foreground tool call that blocks to completion (e.g. a blocking test or build command); never split \"start the wait\" and \"collect the result\" across turns.\n")
 	b.WriteString("- If a tool response says to wait for a future notification/reminder, or that it is running in the background so you can keep working, do not rely on that in Multica-managed runs — block on the appropriate wait / output / collect operation before exiting.\n")
 	b.WriteString("- If you can't observe a background task's result, run the work synchronously instead.\n")
+	b.WriteString("- The rules above apply only to work owned by the current run. External systems triggered by a completed action — for example GitHub Actions after a successful push — are not agent-owned background tasks. Do not wait for them by default; report them as pending and finish the handoff.\n")
+	b.WriteString("- Concretely, after a push or a PR create, unless the explicit exception below applies: do NOT run `gh pr checks --watch`, `gh run watch`, or any sleep / retry loop that polls check status. Enabling auto-merge (`gh pr merge --auto`) is fine — it returns immediately; waiting for it to land is not. Take at most ONE non-blocking status snapshot (`gh pr checks <pr>` or `multica issue pull-requests <issue-id>`) and deliver the evidence you already have: \"Local tests pass (`go test ./...` / `pnpm test`); CI running: <PR link>\". A PR whose CI is still in flight is a complete hand-off.\n")
+	b.WriteString("- A repo's merge requirements — \"CI must be green before merge\", required reviews, branch protection — are GitHub's merge gate, NOT your delivery acceptance criteria, and do not license a wait.\n")
+	b.WriteString("- The one exception: when the trigger comment or the issue's acceptance criteria explicitly ask you for the CI result, that result IS the deliverable — wait for it as ONE foreground blocking call (`gh pr checks <pr> --watch`) inside this same turn and report the outcome. Nothing else re-opens this door.\n")
 	b.WriteString("- Never end a turn with a \"standing by\" / \"I'll report back when X finishes\" message — that becomes your final output and the task ends.\n\n")
 }
 
