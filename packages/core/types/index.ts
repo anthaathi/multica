@@ -172,6 +172,7 @@ export {
   EMPTY_LIST_JIRA_CONNECTIONS_RESPONSE,
   EMPTY_JIRA_CONNECT_RESPONSE,
 } from "./issue-sync";
+export type {
   VCSProvider,
   VCSConnection,
   ListVCSConnectionsResponse,

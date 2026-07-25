@@ -697,7 +697,12 @@
     "copy_workdir": "작업 디렉터리 복사",
     "close": "닫기",
     "fact_created": "생성 {{time}}",
-    "fact_took": "소요 {{duration}}"
+    "fact_took": "소요 {{duration}}",
+    "tool_calls_other": "도구 호출 {{count}}회",
+    "expand_visible": "표시 항목 펼치기",
+    "collapse_visible": "표시 항목 접기",
+    "preserve_filters": "필터 유지",
+    "default_expanded": "기본으로 세부 정보 펼치기"
   },
   "task_failure": {
     "agent_error": "에이전트 실행 오류",

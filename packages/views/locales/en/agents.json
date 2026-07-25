@@ -808,7 +808,13 @@
     "copy_workdir": "Copy working directory",
     "close": "Close",
     "fact_created": "Created {{time}}",
-    "fact_took": "Took {{duration}}"
+    "fact_took": "Took {{duration}}",
+    "tool_calls_one": "{{count}} tool call",
+    "tool_calls_other": "{{count}} tool calls",
+    "expand_visible": "Expand visible",
+    "collapse_visible": "Collapse visible",
+    "preserve_filters": "Preserve filters",
+    "default_expanded": "Open details by default"
   },
   "task_failure": {
     "agent_error": "Agent execution error",

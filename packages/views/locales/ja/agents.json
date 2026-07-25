@@ -689,7 +689,12 @@
     "copy_workdir": "作業ディレクトリをコピー",
     "close": "閉じる",
     "fact_created": "作成 {{time}}",
-    "fact_took": "所要 {{duration}}"
+    "fact_took": "所要 {{duration}}",
+    "tool_calls_other": "ツール呼び出し {{count}} 回",
+    "expand_visible": "表示中を展開",
+    "collapse_visible": "表示中を折りたたむ",
+    "preserve_filters": "フィルターを保持",
+    "default_expanded": "詳細をデフォルトで展開"
   },
   "task_failure": {
     "agent_error": "エージェント実行エラー",

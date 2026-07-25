@@ -708,6 +708,7 @@ export function useRealtimeSync(
       mattermost_installation: () => {
         const wsId = getCurrentWsId();
         if (wsId) qc.invalidateQueries({ queryKey: mattermostKeys.installations(wsId) });
+      },
       vcs_connection: () => {
         const wsId = getCurrentWsId();
         if (wsId) qc.invalidateQueries({ queryKey: ["vcs", wsId] });

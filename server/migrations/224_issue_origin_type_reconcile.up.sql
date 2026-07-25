@@ -1,11 +1,12 @@
 -- Reconcile issue.origin_type CHECK constraint to the full union of values
 -- across upstream and the fork. Renumbered 157 -> 161 -> 163 -> 164 -> 175
--- -> 191 -> 197 -> 202 -> 203 -> 214 as upstream claimed prefix 157
+-- -> 191 -> 197 -> 202 -> 203 -> 214 -> 224 as upstream claimed prefix 157
 -- (157_agent_task_delivered_comments), then 161 (161_agent_skill_enabled), then
 -- 163 (163_agent_builder), then 164 (164_attachment_task_id, PR #5307), then
 -- 175 (175_runtime_profile_add_deveco), then 191 (191_issue_properties,
 -- MUL-4463), then 202 (202_runtime_profile_add_qwen), then 203
--- (203_issue_workspace_assignee_index, sync 2026-07-23); runs last so the
+-- (203_issue_workspace_assignee_index, sync 2026-07-23), then 214
+-- (214_chat_session_project, sync 2026-07-25); runs last so the
 -- union survives regardless of which same-prefix 149 migration ran.
 --
 -- Two prefix-149 migrations each redefined issue_origin_type_check with a

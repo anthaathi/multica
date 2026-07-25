@@ -23,7 +23,7 @@ import {
   type PullRequestChecksStatus,
   type PullRequestMergeStatus,
 } from "@multica/core/github";
-import type { GitHubPullRequest, GitHubPullRequestState } from "@multica/core/types";
+import type { GitHubPullRequest, GitHubPullRequestState, PullRequestProvider } from "@multica/core/types";
 import { cn } from "@multica/ui/lib/utils";
 import { useT, useTimeAgo } from "../../i18n";
 
@@ -132,7 +132,7 @@ function PullRequestRow({ pr }: { pr: GitHubPullRequest }) {
 // ProviderGlyph renders the forge mark (GitHub octocat / GitLab tanuki) so a
 // mixed list makes each row's origin obvious. Defaults to GitHub for rows from
 // older backends that predate the `provider` field.
-function ProviderGlyph({ provider }: { provider?: "github" | "gitlab" }) {
+function ProviderGlyph({ provider }: { provider?: PullRequestProvider }) {
   if (provider === "gitlab") {
     return (
       <svg viewBox="0 0 24 24" aria-hidden="true" className="h-3 w-3 shrink-0" fill="currentColor">

@@ -59,15 +59,13 @@ export interface GitHubInstallation {
 
 /** Which forge a linked change lives on. Absent on older backends; treat
  * absence as "github" (the only provider before GitLab support). */
-export type PullRequestProvider = "github" | "gitlab";
+export type PullRequestProvider = "github" | "gitlab" | "forgejo" | "gitea";
 
 export interface GitHubPullRequest {
   /** Forge this row came from. GitLab merge requests are mapped onto this same
    * shape so the issue-detail list can render both from one array. */
   provider?: PullRequestProvider;
   id: string;
-  /** Source provider. Older GitHub-only backends omit it. */
-  provider?: "github" | "forgejo" | "gitea" | "gitlab";
   workspace_id: string;
   repo_owner: string;
   repo_name: string;
