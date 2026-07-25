@@ -93,6 +93,8 @@
     "./gitlab/queries": "./gitlab/queries.ts",
     "./issue-sync": "./issue-sync/index.ts",
     "./issue-sync/queries": "./issue-sync/queries.ts",
+    "./vcs": "./vcs/index.ts",
+    "./vcs/queries": "./vcs/queries.ts",
     "./lark": "./lark/index.ts",
     "./lark/queries": "./lark/queries.ts",
     "./composio": "./composio/index.ts",

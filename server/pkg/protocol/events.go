@@ -159,8 +159,11 @@ const (
 	EventIssueSyncSourceCreated = "issue_sync_source:created"
 	EventIssueSyncSourceUpdated = "issue_sync_source:updated"
 	EventIssueSyncSourceDeleted = "issue_sync_source:deleted"
-	EventJiraConnectionCreated = "jira_connection:created"
-	EventJiraConnectionDeleted = "jira_connection:deleted"
+	EventJiraConnectionCreated  = "jira_connection:created"
+	EventJiraConnectionDeleted  = "jira_connection:deleted"
+	// VCS integration events (Forgejo / Gitea / GitLab)
+	EventVCSConnectionCreated = "vcs_connection:created"
+	EventVCSConnectionDeleted = "vcs_connection:deleted"
 
 	// Lark integration events. `created` covers both first-install
 	// (UNIQUE on (workspace_id, agent_id) means at most one row per

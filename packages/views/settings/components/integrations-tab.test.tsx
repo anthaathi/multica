@@ -47,6 +47,9 @@ vi.mock("./slack-tab", () => ({
 vi.mock("./mattermost-tab", () => ({
   MattermostTab: () => <div data-testid="mattermost-tab" />,
 }));
+vi.mock("./vcs-tab", () => ({
+  VCSTab: () => <div data-testid="vcs-tab" />,
+}));
 
 import { IntegrationsTab } from "./integrations-tab";
 
@@ -63,6 +66,9 @@ describe("Settings IntegrationsTab", () => {
     queryCallsRef.current = [];
     composioErrorRef.current = null;
     configStore.getState().setFeatureFlags({ [COMPOSIO_MCP_APPS_FLAG]: true });
+    // Reset the self-host-only VCS gate to its default (hidden) so tests stay
+    // isolated; individual tests opt in below.
+    configStore.getState().setAuthConfig({ allowSignup: true, vcsIntegrationAvailable: false });
   });
 
   it("hides Composio and disables the toolkits query when the feature flag is off", () => {
@@ -100,5 +106,21 @@ describe("Settings IntegrationsTab", () => {
     expect(
       screen.getByRole("heading", { name: /^Mattermost$/i }),
     ).toBeInTheDocument();
+  });
+
+
+  it("hides the Git providers section when the deployment reports it unavailable", () => {
+    // Default (managed cloud / older server): vcsIntegrationAvailable is false.
+    renderTab();
+
+    expect(screen.queryByTestId("vcs-tab")).toBeNull();
+  });
+
+  it("shows the Git providers section on a self-hosted deployment that enables it", () => {
+    configStore.getState().setAuthConfig({ allowSignup: true, vcsIntegrationAvailable: true });
+
+    renderTab();
+
+    expect(screen.getByTestId("vcs-tab")).toBeInTheDocument();
   });
 });

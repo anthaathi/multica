@@ -206,6 +206,7 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 		AllowedEmails:            splitAndTrim(os.Getenv("ALLOWED_EMAILS")),
 		AllowedEmailDomains:      splitAndTrim(os.Getenv("ALLOWED_EMAIL_DOMAINS")),
 		DisableWorkspaceCreation: os.Getenv("DISABLE_WORKSPACE_CREATION") == "true",
+		VCSIntegrationEnabled:    os.Getenv("MULTICA_VCS_INTEGRATION_ENABLED") == "true",
 		PublicURL:                strings.TrimRight(strings.TrimSpace(os.Getenv("MULTICA_PUBLIC_URL")), "/"),
 		TrustedProxies:           parseTrustedProxies(os.Getenv("MULTICA_TRUSTED_PROXIES")),
 		CloudRuntimeFleetURL:     cloudRuntimeFleetURLFromEnv(),
@@ -732,6 +733,22 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 		slog.Info("composio integration disabled (COMPOSIO_API_KEY not set)")
 	}
 
+	// VCS at-rest encryption: the box encrypts per-workspace access tokens and
+	// webhook secrets for token-based providers (Forgejo / Gitea / GitLab).
+	// Without it, connect/webhook handlers return 503 (so a misconfigured
+	// self-host never stores plaintext secrets).
+	if vcsKey, err := secretbox.LoadKey("MULTICA_VCS_SECRET_KEY"); err == nil {
+		box, err := secretbox.New(vcsKey)
+		if err != nil {
+			slog.Error("vcs: secretbox.New failed; vcs integration disabled", "error", err)
+		} else {
+			h.VCSSecretBox = box
+			slog.Info("vcs integration enabled")
+		}
+	} else {
+		slog.Info("vcs integration disabled (MULTICA_VCS_SECRET_KEY not set)")
+	}
+
 	if opts.HeartbeatScheduler != nil {
 		h.HeartbeatScheduler = opts.HeartbeatScheduler
 	}
@@ -880,6 +897,11 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 	// browser redirect; the workspace/agent/initiator are recovered from the
 	// sealed state). It exchanges the code, upserts the install, then bounces
 	// the browser back to Settings → Integrations.
+	// VCS webhook for token-based providers (Forgejo / Gitea / GitLab). No Multica
+	// auth — authenticated per-connection by the provider's signature scheme;
+	// the connection id in the path selects the workspace, provider, and
+	// decryption secret.
+	r.Post("/api/webhooks/vcs/{connectionId}", h.HandleVCSWebhook)
 	// Stripe webhook (no Multica auth — Stripe signs the raw body
 	// with a shared secret, the multica-cloud upstream verifies. We
 	// only forward the bytes + the Stripe-Signature header; see
@@ -1008,11 +1030,15 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					// Listing GitLab connections is member-visible for the same
 					// reason as GitHub; the handler strips the webhook secret and
 					// adds a can_manage hint.
-				r.Get("/gitlab/connections", h.ListGitLabConnections)
-				// Listing Jira connections is member-visible, mirroring GitLab.
-				r.Get("/jira/connections", h.ListJiraConnections)
-				// Remote repo/project picker for issue-sync source attach.
-				r.Get("/sync/{provider}/remote-projects", h.ListRemoteContainers)
+					r.Get("/gitlab/connections", h.ListGitLabConnections)
+					// Listing Jira connections is member-visible, mirroring GitLab.
+					r.Get("/jira/connections", h.ListJiraConnections)
+					// Remote repo/project picker for issue-sync source attach.
+					r.Get("/sync/{provider}/remote-projects", h.ListRemoteContainers)
+					// VCS connections (Forgejo / Gitea / GitLab) — member-visible
+					// for the same reason as GitHub installations; connect /
+					// disconnect are admin-gated in the group below.
+					r.Get("/vcs/connections", h.ListVCSConnections)
 					// Custom runtime profiles — listing/reading is member-visible
 					// (the Runtime page renders for everyone; create/edit/delete
 					// are admin-gated below).
@@ -1049,10 +1075,14 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					// GitLab integration — connect / disconnect admin-only,
 					// mirroring GitHub.
 					r.Get("/gitlab/connect", h.GitLabConnect)
-				r.Delete("/gitlab/connections/{connectionId}", h.DeleteGitLabConnection)
-				// Jira integration — connect / disconnect admin-only, mirroring GitLab.
-				r.Get("/jira/connect", h.JiraConnect)
-				r.Delete("/jira/connections/{connectionId}", h.DeleteJiraConnection)
+					r.Delete("/gitlab/connections/{connectionId}", h.DeleteGitLabConnection)
+					// Jira integration — connect / disconnect admin-only, mirroring GitLab.
+					r.Get("/jira/connect", h.JiraConnect)
+					r.Delete("/jira/connections/{connectionId}", h.DeleteJiraConnection)
+					// VCS connect / disconnect / webhook regeneration (admin-only).
+					r.Post("/vcs/connections", h.ConnectVCS)
+					r.Post("/vcs/connections/{connectionId}/rotate-webhook", h.RotateVCSConnectionWebhook)
+					r.Delete("/vcs/connections/{connectionId}", h.DeleteVCSConnection)
 				})
 
 				// Lark integration. Every endpoint here only requires
@@ -1289,14 +1319,14 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					r.Get("/resources", h.ListProjectResources)
 					r.Post("/resources", h.CreateProjectResource)
 					r.Put("/resources/{resourceId}", h.UpdateProjectResource)
-				r.Delete("/resources/{resourceId}", h.DeleteProjectResource)
-				// Issue sync sources — bidirectional GitHub/GitLab/Jira sync.
-				r.Get("/sync-sources", h.ListSyncSources)
-				r.Post("/sync-sources", h.CreateSyncSource)
-				r.Put("/sync-sources/{sourceId}", h.UpdateSyncSource)
-				r.Delete("/sync-sources/{sourceId}", h.DeleteSyncSource)
-				// Bulk sync: push all project issues to their sync sources.
-				r.Post("/sync-all", h.SyncAllProjectIssues)
+					r.Delete("/resources/{resourceId}", h.DeleteProjectResource)
+					// Issue sync sources — bidirectional GitHub/GitLab/Jira sync.
+					r.Get("/sync-sources", h.ListSyncSources)
+					r.Post("/sync-sources", h.CreateSyncSource)
+					r.Put("/sync-sources/{sourceId}", h.UpdateSyncSource)
+					r.Delete("/sync-sources/{sourceId}", h.DeleteSyncSource)
+					// Bulk sync: push all project issues to their sync sources.
+					r.Post("/sync-all", h.SyncAllProjectIssues)
 				})
 			})
 

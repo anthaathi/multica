@@ -131,6 +131,9 @@ export type {
   GitHubMergeableState,
   GitHubPullRequest,
   GitHubPullRequestChecksConclusion,
+  GitHubPullRequestChecksRollup,
+  GitHubPullRequestMergeable,
+  GitHubPullRequestMergeStateStatus,
   GitHubPullRequestState,
   ListGitHubInstallationsResponse,
   GitHubConnectResponse,
@@ -169,6 +172,12 @@ export {
   EMPTY_LIST_JIRA_CONNECTIONS_RESPONSE,
   EMPTY_JIRA_CONNECT_RESPONSE,
 } from "./issue-sync";
+  VCSProvider,
+  VCSConnection,
+  ListVCSConnectionsResponse,
+  ConnectVCSRequest,
+  ConnectVCSResponse,
+} from "./vcs";
 export type {
   LarkInstallation,
   ListLarkInstallationsResponse,
