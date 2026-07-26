@@ -1,0 +1,17 @@
+Merge upstream/main into fork (sync 2026-07-26)
+
+Clean merge — no conflicts. Brought in 6 upstream commits:
+
+- 1869b1b5e test(issues): give table-view editor test 60s to survive CI CPU starvation (MUL-5326)
+- 156c592c9 fix(attachments): presign desktop inline media (#5946)
+- 3d4c5c7da feat(cli): add 'multica agent copy' to fork an agent across runtimes (MUL-5279)
+- 286ed61bb fix(agent): reap claude process group on cancellation (#5918)
+- 4931ee6f7 docs(chat): correct the chat sandbox description (MUL-5287)
+- af1ff00e1 test(cli): use example domains in setup fixtures (#5944)
+
+Verified locally: go build/vet ./..., go test ./internal/migrations/ -run TestMigration
+(including TestMigrationNumericPrefixesStayUniqueAfterLegacySet), and frontend typecheck
+for @multica/core, @multica/views, @multica/web, @multica/desktop.
+
+No migrations touched upstream this round, so the fork-owned issue_origin_type_reconcile
+migration prefix (224) is unchanged.
