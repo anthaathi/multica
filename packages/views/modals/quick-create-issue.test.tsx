@@ -149,6 +149,12 @@ vi.mock("@multica/core/workspace/queries", () => ({
 vi.mock("@multica/core/projects/queries", () => ({
   projectListOptions: () => ({ queryKey: ["projects"] }),
 }));
+vi.mock("@multica/core/runtimes", () => ({
+  runtimeListOptions: () => ({ queryKey: ["runtimes"] }),
+  checkQuickCreateCliVersion: () => ({ state: "ok", min: "1.0.0" }),
+  checkQuickCreateFieldsCliVersion: () => ({ state: "ok", min: "1.0.0" }),
+  readRuntimeCliVersion: () => "1.2.3",
+}));
 
 vi.mock("@multica/core/issues/stores/quick-create-store", () => ({
   useQuickCreateStore: (selector?: (state: typeof mockQuickCreateStore) => unknown) =>
