@@ -94,33 +94,33 @@ export function JiraTab() {
   return (
     <div className="space-y-8">
       <section className="space-y-1">
-        <p className="text-sm text-muted-foreground">{t(($) => $.jira.page_description)}</p>
+        <p className="text-body text-muted-foreground">{t(($) => $.jira.page_description)}</p>
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold">{t(($) => $.jira.section_connection)}</h2>
+        <h2 className="text-body font-semibold">{t(($) => $.jira.section_connection)}</h2>
         <Card>
           <CardContent className="space-y-4">
             <div className="flex items-start justify-between gap-4">
               <div className="flex items-start gap-3">
                 <JiraMark className="mt-0.5 h-6 w-6 shrink-0" />
                 <div className="space-y-1">
-                  <Label className="text-sm font-medium">
+                  <Label className="text-body font-medium">
                     {t(($) => $.jira.connection_title)}
                   </Label>
                   {connected ? (
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-caption text-muted-foreground">
                       {t(($) => $.jira.connected_to, {
                         site: primaryConnection?.site_url ?? "",
                         email: primaryConnection?.account_email ?? "",
                       })}
                     </p>
                   ) : canManage ? (
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-caption text-muted-foreground">
                       {t(($) => $.jira.connection_description)}
                     </p>
                   ) : (
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-caption text-muted-foreground">
                       {t(($) => $.jira.contact_admin_to_connect)}
                     </p>
                   )}
@@ -153,11 +153,11 @@ export function JiraTab() {
             </div>
 
             {canManage && !configured && (
-              <p className="text-xs text-muted-foreground">{t(($) => $.jira.not_configured)}</p>
+              <p className="text-caption text-muted-foreground">{t(($) => $.jira.not_configured)}</p>
             )}
 
             {!canManage && connected && (
-              <p className="text-xs text-muted-foreground">{t(($) => $.jira.read_only_hint)}</p>
+              <p className="text-caption text-muted-foreground">{t(($) => $.jira.read_only_hint)}</p>
             )}
 
             {connected && primaryConnection?.site_url && (
@@ -165,7 +165,7 @@ export function JiraTab() {
                 href={primaryConnection.site_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                className="inline-flex items-center gap-1 text-caption text-muted-foreground hover:text-foreground"
               >
                 <ExternalLink className="h-3 w-3" />
                 {primaryConnection.site_url}

@@ -128,7 +128,7 @@ export function GitLabTab() {
   return (
     <div className="space-y-8">
       <section className="space-y-1">
-        <p className="text-sm text-muted-foreground">{t(($) => $.gitlab.page_description)}</p>
+        <p className="text-body text-muted-foreground">{t(($) => $.gitlab.page_description)}</p>
       </section>
 
       <section className="space-y-3">
@@ -140,10 +140,10 @@ export function GitLabTab() {
                   <GitLabMark className="h-4 w-4" />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="gitlab-master" className="text-sm font-medium">
+                  <Label htmlFor="gitlab-master" className="text-body font-medium">
                     {t(($) => $.gitlab.section_master)}
                   </Label>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-body text-muted-foreground">
                     {flags.enabled
                       ? t(($) => $.gitlab.master_description_on)
                       : t(($) => $.gitlab.master_description_off)}
@@ -162,26 +162,26 @@ export function GitLabTab() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold">{t(($) => $.gitlab.section_connection)}</h2>
+        <h2 className="text-body font-semibold">{t(($) => $.gitlab.section_connection)}</h2>
         <Card>
           <CardContent className="space-y-4">
             <div className="flex items-start justify-between gap-4">
               <div className="flex items-start gap-3">
                 <GitLabMark className="h-6 w-6 mt-0.5 shrink-0" />
                 <div className="space-y-1">
-                  <p className="text-sm font-medium">{t(($) => $.gitlab.connection_title)}</p>
+                  <p className="text-body font-medium">{t(($) => $.gitlab.connection_title)}</p>
                   {connected ? (
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-caption text-muted-foreground">
                       {t(($) => $.gitlab.connected_to, {
                         login: connections.map((c) => c.gitlab_username).join(", "),
                       })}
                     </p>
                   ) : canManage ? (
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-caption text-muted-foreground">
                       {t(($) => $.gitlab.connection_description)}
                     </p>
                   ) : (
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-caption text-muted-foreground">
                       {t(($) => $.gitlab.contact_admin_to_connect)}
                     </p>
                   )}
@@ -214,11 +214,11 @@ export function GitLabTab() {
             </div>
 
             {canManage && !configured && (
-              <p className="text-xs text-muted-foreground">{t(($) => $.gitlab.not_configured)}</p>
+              <p className="text-caption text-muted-foreground">{t(($) => $.gitlab.not_configured)}</p>
             )}
 
             {!canManage && connected && (
-              <p className="text-xs text-muted-foreground">{t(($) => $.gitlab.read_only_hint)}</p>
+              <p className="text-caption text-muted-foreground">{t(($) => $.gitlab.read_only_hint)}</p>
             )}
           </CardContent>
         </Card>
@@ -226,10 +226,10 @@ export function GitLabTab() {
 
       {canManage && connected && primaryConnection?.webhook_url && (
         <section className="space-y-3">
-          <h2 className="text-sm font-semibold">{t(($) => $.gitlab.section_webhook)}</h2>
+          <h2 className="text-body font-semibold">{t(($) => $.gitlab.section_webhook)}</h2>
           <Card>
             <CardContent className="space-y-3">
-              <p className="text-xs text-muted-foreground">{t(($) => $.gitlab.webhook_description)}</p>
+              <p className="text-caption text-muted-foreground">{t(($) => $.gitlab.webhook_description)}</p>
               <WebhookField
                 label={t(($) => $.gitlab.webhook_url_label)}
                 value={primaryConnection.webhook_url}
@@ -248,7 +248,7 @@ export function GitLabTab() {
       )}
 
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold">{t(($) => $.gitlab.section_features)}</h2>
+        <h2 className="text-body font-semibold">{t(($) => $.gitlab.section_features)}</h2>
         <Card>
           <CardContent className="space-y-4">
             <FeatureRow
@@ -275,11 +275,11 @@ export function GitLabTab() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold">{t(($) => $.gitlab.section_repositories)}</h2>
+        <h2 className="text-body font-semibold">{t(($) => $.gitlab.section_repositories)}</h2>
         <Card>
           <CardContent>
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="text-sm font-medium">
+              <p className="text-body font-medium">
                 {t(($) => $.gitlab.repositories_shortcut_label)}
               </p>
               <Button
@@ -335,9 +335,9 @@ function WebhookField({
 }) {
   return (
     <div className="space-y-1">
-      <Label className="text-xs text-muted-foreground">{label}</Label>
+      <Label className="text-caption text-muted-foreground">{label}</Label>
       <div className="flex items-center gap-2">
-        <code className="flex-1 truncate rounded bg-muted px-2 py-1 text-[11px]">{value}</code>
+        <code className="flex-1 truncate rounded bg-muted px-2 py-1 text-micro">{value}</code>
         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onCopy(value)}>
           <Copy className="h-3.5 w-3.5" />
         </Button>
@@ -368,10 +368,10 @@ function FeatureRow({
       <div className="flex items-start gap-3">
         <div className="rounded-md border bg-muted/50 p-2 text-muted-foreground">{icon}</div>
         <div className="space-y-1">
-          <Label htmlFor={id} className="text-sm font-medium">
+          <Label htmlFor={id} className="text-body font-medium">
             {label}
           </Label>
-          <p className="text-sm text-muted-foreground">{description}</p>
+          <p className="text-body text-muted-foreground">{description}</p>
         </div>
       </div>
       <Switch id={id} checked={checked} disabled={disabled} onCheckedChange={onCheckedChange} />

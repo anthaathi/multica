@@ -41,7 +41,7 @@ export function IssueSyncBadges({
           </>
         );
         const cls =
-          "inline-flex items-center gap-1 rounded-full border bg-muted/40 px-2 py-0.5 text-xs text-muted-foreground hover:text-foreground transition-colors";
+          "inline-flex items-center gap-1 rounded-full border bg-muted/40 px-2 py-0.5 text-caption text-muted-foreground hover:text-foreground transition-colors";
         return link.web_url ? (
           <a
             key={`${link.provider}-${link.external_key}-${i}`}

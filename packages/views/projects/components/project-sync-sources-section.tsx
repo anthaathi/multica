@@ -102,7 +102,7 @@ export function ProjectSyncSourcesSection({ projectId }: { projectId: string }) 
       <div className="flex items-center justify-between">
         <button
           type="button"
-          className="-ml-2 flex w-full items-center gap-1 rounded px-2 py-0.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+          className="-ml-2 flex w-full items-center gap-1 rounded px-2 py-0.5 text-caption font-medium text-muted-foreground hover:text-foreground"
         >
           {t(($) => $.sync_sources.section_title)}
         </button>
@@ -120,7 +120,7 @@ export function ProjectSyncSourcesSection({ projectId }: { projectId: string }) 
         {isLoading ? (
           <Skeleton className="h-8 w-full" />
         ) : sources.length === 0 ? (
-          <p className="px-2 text-xs text-muted-foreground">
+          <p className="px-2 text-caption text-muted-foreground">
             {t(($) => $.sync_sources.empty)}
           </p>
         ) : (
@@ -195,10 +195,10 @@ function SyncSourceRow({
   return (
     <div className="flex items-center gap-2 rounded-md border px-2.5 py-1.5">
       <ProviderGlyph provider={source.provider} className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-      <span className="min-w-0 flex-1 truncate text-xs font-medium">
+      <span className="min-w-0 flex-1 truncate text-caption font-medium">
         {source.external_key}
       </span>
-      <Badge variant="secondary" className="shrink-0 px-1.5 py-0 text-[10px] font-normal">
+      <Badge variant="secondary" className="shrink-0 px-1.5 py-0 text-micro font-normal">
         {backfillLabel}
       </Badge>
       <Switch
@@ -210,7 +210,7 @@ function SyncSourceRow({
       <Button
         variant="ghost"
         size="sm"
-        className="h-6 shrink-0 px-1.5 text-xs text-muted-foreground"
+        className="h-6 shrink-0 px-1.5 text-caption text-muted-foreground"
         onClick={() => setRemoveTarget(true)}
       >
         <Trash2 className="h-3 w-3" />
@@ -352,7 +352,7 @@ function AddSyncSourceDialog({
         <div className="space-y-3">
           {/* Provider */}
           <div className="space-y-1">
-            <Label className="text-xs">{t(($) => $.sync_sources.step_provider)}</Label>
+            <Label className="text-caption">{t(($) => $.sync_sources.step_provider)}</Label>
             <Select
               items={PROVIDERS.map((p) => ({ value: p, label: t(($) => $.sync_sources[`provider_${p}` as keyof typeof $.sync_sources] as string) }))}
               value={provider}
@@ -378,9 +378,9 @@ function AddSyncSourceDialog({
           {/* Connection */}
           {provider && (
             <div className="space-y-1">
-              <Label className="text-xs">{t(($) => $.sync_sources.step_connection)}</Label>
+              <Label className="text-caption">{t(($) => $.sync_sources.step_connection)}</Label>
               {connections.length === 0 ? (
-                <p className="text-xs text-muted-foreground">
+                <p className="text-caption text-muted-foreground">
                   {t(($) => $.sync_sources.connection_none)}
                 </p>
               ) : (
@@ -410,7 +410,7 @@ function AddSyncSourceDialog({
           {/* Remote container */}
           {provider && connectionId && (
             <div className="space-y-1">
-              <Label className="text-xs">{t(($) => $.sync_sources.step_container)}</Label>
+              <Label className="text-caption">{t(($) => $.sync_sources.step_container)}</Label>
               <Select
                 items={(containers.data ?? []).map((c) => ({ value: c.key, label: c.name || c.key }))}
                 value={containerKey}
@@ -432,11 +432,11 @@ function AddSyncSourceDialog({
                 </SelectTrigger>
                 <SelectContent>
                   {containers.isLoading ? (
-                    <div className="px-2 py-1 text-xs text-muted-foreground">
+                    <div className="px-2 py-1 text-caption text-muted-foreground">
                       {t(($) => $.sync_sources.container_loading)}
                     </div>
                   ) : (containers.data ?? []).length === 0 ? (
-                    <div className="px-2 py-1 text-xs text-muted-foreground">
+                    <div className="px-2 py-1 text-caption text-muted-foreground">
                       {t(($) => $.sync_sources.container_empty)}
                     </div>
                   ) : (
@@ -454,7 +454,7 @@ function AddSyncSourceDialog({
           {/* Push default */}
           {provider && connectionId && (
             <label className="flex items-center justify-between rounded-md border px-3 py-2">
-              <span className="text-xs">
+              <span className="text-caption">
                 <span className="font-medium">{t(($) => $.sync_sources.push_default)}</span>
                 <span className="ml-2 text-muted-foreground">
                   {t(($) => $.sync_sources.push_default_hint)}

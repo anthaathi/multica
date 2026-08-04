@@ -387,22 +387,22 @@ export function AgentTranscriptDialog({
       : t(($) => $.transcript.copy_all);
 
   const statusBadge = isLive ? (
-    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-info/15 px-2 py-0.5 text-xs font-medium text-info">
+    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-info/15 px-2 py-0.5 text-caption font-medium text-info">
       <Loader2 className="h-3 w-3 animate-spin" />
       {t(($) => $.transcript.status_running)}
     </span>
   ) : task.status === "completed" ? (
-    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-success/15 px-2 py-0.5 text-xs font-medium text-success">
+    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-success/15 px-2 py-0.5 text-caption font-medium text-success">
       <CheckCircle2 className="h-3 w-3" />
       {t(($) => $.transcript.status_completed)}
     </span>
   ) : task.status === "failed" ? (
-    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-destructive/15 px-2 py-0.5 text-xs font-medium text-destructive">
+    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-destructive/15 px-2 py-0.5 text-caption font-medium text-destructive">
       <XCircle className="h-3 w-3" />
       {t(($) => $.transcript.status_failed)}
     </span>
   ) : (
-    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground capitalize">
+    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-caption font-medium text-muted-foreground capitalize">
       {task.status}
     </span>
   );
@@ -426,7 +426,7 @@ export function AgentTranscriptDialog({
                   <Bot className="h-3.5 w-3.5" />
                 </div>
               )}
-              <span className="truncate font-medium text-sm">{agentName}</span>
+              <span className="truncate font-medium text-body">{agentName}</span>
             </div>
 
             {statusBadge}
@@ -444,7 +444,7 @@ export function AgentTranscriptDialog({
                       ? t(($) => $.transcript.collapse_visible)
                       : t(($) => $.transcript.expand_visible)
                   }
-                  className="flex shrink-0 items-center gap-1 rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  className="flex shrink-0 items-center gap-1 rounded px-2 py-1 text-caption text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                 >
                   {allExpanded
                     ? t(($) => $.transcript.collapse_visible)
@@ -467,7 +467,7 @@ export function AgentTranscriptDialog({
                   <DropdownMenuTrigger
                     aria-label={t(($) => $.transcript.filter)}
                     className={cn(
-                      "flex shrink-0 items-center gap-1 rounded px-2 py-1 text-xs transition-colors",
+                      "flex shrink-0 items-center gap-1 rounded px-2 py-1 text-caption transition-colors",
                       activeFilterKeys.length > 0
                         ? "text-blue-600 dark:text-blue-400 bg-blue-500/10 hover:bg-blue-500/20"
                         : "text-muted-foreground hover:text-foreground hover:bg-accent",
@@ -476,7 +476,7 @@ export function AgentTranscriptDialog({
                     <Filter className="h-3 w-3" />
                     <span className="hidden sm:inline">{t(($) => $.transcript.filter)}</span>
                     {activeFilterKeys.length > 0 && (
-                      <span className="ml-0.5 rounded-full bg-blue-500/20 px-1.5 py-0 text-[10px] font-medium">
+                      <span className="ml-0.5 rounded-full bg-blue-500/20 px-1.5 py-0 text-micro font-medium">
                         {activeFilterKeys.length}
                       </span>
                     )}
@@ -519,7 +519,7 @@ export function AgentTranscriptDialog({
                 type="button"
                 onClick={handleCopyAll}
                 aria-label={copyTranscriptLabel}
-                className="flex shrink-0 items-center gap-1 rounded px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                className="flex shrink-0 items-center gap-1 rounded px-2 py-1 text-caption text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
               >
                 {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                 <span className="hidden sm:inline">{copyTranscriptLabel}</span>
@@ -535,7 +535,7 @@ export function AgentTranscriptDialog({
           </div>
 
           {/* Metadata chips */}
-          <div className="flex items-center gap-2 flex-wrap text-xs">
+          <div className="flex items-center gap-2 flex-wrap text-caption">
             {runtimeInfo?.provider && (
               <MetadataChip icon={<Cpu className="h-3 w-3" />}>
                 {formatProvider(runtimeInfo.provider)}
@@ -552,7 +552,7 @@ export function AgentTranscriptDialog({
                 }
               >
                 {runtimeInfo.name}
-                <span className="text-muted-foreground/60 ml-0.5">({runtimeInfo.runtime_mode})</span>
+                <span className="text-muted-foreground ml-0.5">({runtimeInfo.runtime_mode})</span>
               </MetadataChip>
             )}
             {agentInfo?.description && (
@@ -583,7 +583,7 @@ export function AgentTranscriptDialog({
                 type="button"
                 onClick={handleCopyWorkdir}
                 title={task.relative_work_dir}
-                className="inline-flex max-w-[16rem] items-center gap-1 rounded-md border bg-muted/50 px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                className="inline-flex max-w-[16rem] items-center gap-1 rounded-md border bg-muted/50 px-2 py-0.5 text-micro text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               >
                 {copiedWorkdir ? (
                   <Check className="h-3 w-3 shrink-0 text-emerald-500" />
@@ -626,7 +626,7 @@ export function AgentTranscriptDialog({
 
         {/* ── Conversation list ─────────────────────────────────── */}
         {displayNodes.length === 0 ? (
-          <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+          <div className="flex flex-1 items-center justify-center text-body text-muted-foreground">
             {isAntigravityLiveEmpty ? (
               <div className="flex max-w-md items-center gap-2 px-4 text-center">
                 <Clock className="h-4 w-4 shrink-0" />
@@ -698,7 +698,7 @@ function ConversationRow({
       <div ref={rowRef} data-node-key={nodeKey(node)}>
         <AssistantMessage item={node.item} />
         {time && (
-          <div className="mt-1 text-[10px] tabular-nums text-muted-foreground/40">
+          <div className="mt-1 text-micro tabular-nums text-muted-foreground">
             {time}
           </div>
         )}
@@ -838,7 +838,7 @@ function ToggleBtn({
       aria-pressed={active}
       title={label}
       className={cn(
-        "flex items-center gap-1 rounded px-1.5 py-0.5 text-xs transition-colors",
+        "flex items-center gap-1 rounded px-1.5 py-0.5 text-caption transition-colors",
         active
           ? "bg-accent text-foreground"
           : "text-muted-foreground hover:text-foreground",
@@ -860,7 +860,7 @@ function MetadataChip({
   children: React.ReactNode;
 }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-md border bg-muted/50 px-2 py-0.5 text-[11px] text-muted-foreground">
+    <span className="inline-flex items-center gap-1 rounded-md border bg-muted/50 px-2 py-0.5 text-micro text-muted-foreground">
       {icon}
       {children}
     </span>

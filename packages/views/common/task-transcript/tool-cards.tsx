@@ -93,7 +93,7 @@ function CopyChip({ getText, label }: { getText: () => string; label: string }) 
       }}
       aria-label={label}
       title={label}
-      className="flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+      className="flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-micro text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
     >
       {copied ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3" />}
     </button>
@@ -110,10 +110,10 @@ function TerminalBlock({ command, output }: { command?: string; output: string }
     <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950 dark:bg-black/60">
       <div className="flex items-center justify-between border-b border-zinc-800/80 px-3 py-1.5">
         {/* eslint-disable-next-line i18next/no-literal-string */}
-        <span className="font-mono text-[11px] text-zinc-400">terminal</span>
+        <span className="font-mono text-micro text-zinc-400">terminal</span>
         <CopyChip getText={() => `${command ?? ""}\n${output}`} label="Copy output" />
       </div>
-      <div className="px-3 py-2 font-mono text-[11px] leading-relaxed">
+      <div className="px-3 py-2 font-mono text-micro leading-relaxed">
         {command && <div className="text-emerald-400">$ {command}</div>}
         {output ? (
           <pre className="mt-1 whitespace-pre-wrap break-words text-zinc-300">{shown}</pre>
@@ -125,7 +125,7 @@ function TerminalBlock({ command, output }: { command?: string; output: string }
           <button
             type="button"
             onClick={() => setExpanded((v) => !v)}
-            className="mt-1.5 text-[11px] text-sky-400 hover:text-sky-300"
+            className="mt-1.5 text-micro text-sky-400 hover:text-sky-300"
           >
             {expanded ? "Show less" : `Show all (${output.length.toLocaleString()} chars)`}
           </button>
@@ -140,12 +140,12 @@ function CodeBlock({ code, language, path }: { code: string; language?: string; 
   return (
     <div className="overflow-hidden rounded-lg border bg-muted/30">
       {path && (
-        <div className="flex items-center gap-1.5 border-b bg-muted/50 px-3 py-1 font-mono text-[11px] text-muted-foreground">
+        <div className="flex items-center gap-1.5 border-b bg-muted/50 px-3 py-1 font-mono text-micro text-muted-foreground">
           <FileText className="size-3" />
           <span className="truncate">{path}</span>
         </div>
       )}
-      <div className="max-h-96 overflow-auto px-3 py-2 text-[12px] leading-relaxed [&_pre]:!bg-transparent [&_pre]:!p-0 [&_code]:!bg-transparent [&>*:first-child]:!mt-0 [&>*:last-child]:!mb-0">
+      <div className="max-h-96 overflow-auto px-3 py-2 text-caption leading-relaxed [&_pre]:!bg-transparent [&_pre]:!p-0 [&_code]:!bg-transparent [&>*:first-child]:!mt-0 [&>*:last-child]:!mb-0">
         <MemoizedMarkdown>{fence}</MemoizedMarkdown>
       </div>
     </div>
@@ -165,10 +165,10 @@ function DiffPane({ label, tone, code, language }: { label: string; tone: "add" 
   const fence = "```" + (language ?? "") + "\n" + code + "\n```";
   return (
     <div className={cn("overflow-hidden rounded-lg border", tone === "del" ? "border-red-500/30 bg-red-500/5" : "border-emerald-500/30 bg-emerald-500/5")}>
-      <div className={cn("border-b px-3 py-1 text-[10px] font-medium uppercase tracking-wide", tone === "del" ? "border-red-500/20 text-red-600 dark:text-red-400" : "border-emerald-500/20 text-emerald-600 dark:text-emerald-400")}>
+      <div className={cn("border-b px-3 py-1 text-micro font-medium uppercase tracking-wide", tone === "del" ? "border-red-500/20 text-red-600 dark:text-red-400" : "border-emerald-500/20 text-emerald-600 dark:text-emerald-400")}>
         {label}
       </div>
-      <div className="max-h-72 overflow-auto px-3 py-2 text-[12px] [&_pre]:!bg-transparent [&_pre]:!p-0 [&>*:first-child]:!mt-0 [&>*:last-child]:!mb-0">
+      <div className="max-h-72 overflow-auto px-3 py-2 text-caption [&_pre]:!bg-transparent [&_pre]:!p-0 [&>*:first-child]:!mt-0 [&>*:last-child]:!mb-0">
         <MemoizedMarkdown>{fence}</MemoizedMarkdown>
       </div>
     </div>
@@ -238,7 +238,7 @@ export const ToolNodeCard = memo(function ToolNodeCard({ node, expanded, onExpan
   } else if (tool === "grep" || tool === "glob") {
     const matches = parseGrepMatches(outText);
     body = matches ? (
-      <div className="rounded-lg border bg-muted/30 px-3 py-2 font-mono text-[11px]">
+      <div className="rounded-lg border bg-muted/30 px-3 py-2 font-mono text-micro">
         {matches.count !== undefined && (
           <div className="mb-1 text-muted-foreground">
             {/* eslint-disable-next-line i18next/no-literal-string */}
@@ -247,7 +247,7 @@ export const ToolNodeCard = memo(function ToolNodeCard({ node, expanded, onExpan
         )}
         <div className="max-h-72 space-y-0.5 overflow-auto">
           {matches.lines.map((l, i) => (
-            <div key={i} className="truncate text-foreground/80">{l}</div>
+            <div key={i} className="truncate text-foreground">{l}</div>
           ))}
         </div>
       </div>
@@ -262,10 +262,10 @@ export const ToolNodeCard = memo(function ToolNodeCard({ node, expanded, onExpan
     body = (
       <div className="space-y-1.5">
         {inputJson && (
-          <pre className="max-h-60 overflow-auto rounded-lg border bg-muted/30 p-2.5 font-mono text-[11px] text-muted-foreground whitespace-pre-wrap break-all">{inputJson}</pre>
+          <pre className="max-h-60 overflow-auto rounded-lg border bg-muted/30 p-2.5 font-mono text-micro text-muted-foreground whitespace-pre-wrap break-all">{inputJson}</pre>
         )}
         {outText && (
-          <pre className="max-h-60 overflow-auto rounded-lg border bg-muted/30 p-2.5 font-mono text-[11px] text-muted-foreground whitespace-pre-wrap break-all">{redactSecrets(outText)}</pre>
+          <pre className="max-h-60 overflow-auto rounded-lg border bg-muted/30 p-2.5 font-mono text-micro text-muted-foreground whitespace-pre-wrap break-all">{redactSecrets(outText)}</pre>
         )}
       </div>
     );
@@ -284,11 +284,11 @@ export const ToolNodeCard = memo(function ToolNodeCard({ node, expanded, onExpan
         <MarkerIcon>
           {running ? <Loader2 className="size-3.5 animate-spin" /> : <Icon className="size-3.5" />}
         </MarkerIcon>
-        <MarkerContent className="flex min-w-0 items-center gap-1.5 text-xs">
-          <ChevronRight className={cn("size-3 shrink-0 text-muted-foreground/60 transition-transform", expanded && "rotate-90")} />
+        <MarkerContent className="flex min-w-0 items-center gap-1.5 text-caption">
+          <ChevronRight className={cn("size-3 shrink-0 text-faint-foreground transition-transform", expanded && "rotate-90")} />
           <span className="shrink-0 font-medium text-foreground">{verb}</span>
           {code && (
-            <code className="min-w-0 truncate rounded bg-muted px-1 py-0.5 font-mono text-[11px] text-muted-foreground">{code}</code>
+            <code className="min-w-0 truncate rounded bg-muted px-1 py-0.5 font-mono text-micro text-muted-foreground">{code}</code>
           )}
         </MarkerContent>
       </CollapsibleTrigger>
@@ -305,7 +305,7 @@ export function AssistantMessage({ item }: { item: TimelineItem }) {
   return (
     <Bubble variant="ghost">
       <BubbleContent>
-        <div className="prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+        <div className="prose prose-sm dark:prose-invert max-w-none text-body leading-relaxed [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
           <MemoizedMarkdown>{item.content ?? ""}</MemoizedMarkdown>
         </div>
       </BubbleContent>
@@ -325,16 +325,16 @@ export function ThinkingMessage({ item }: { item: TimelineItem }) {
         <MarkerIcon>
           <Brain className="size-3.5 text-violet-500/70" />
         </MarkerIcon>
-        <MarkerContent className="flex items-center gap-1.5 text-xs italic text-muted-foreground">
+        <MarkerContent className="flex items-center gap-1.5 text-caption italic text-muted-foreground">
           <ChevronRight className={cn("size-3 shrink-0 transition-transform", open && "rotate-90")} />
           {open ? "Hide reasoning" : "Reasoning"}
           {/* eslint-disable-next-line i18next/no-literal-string */}
-          <span className="not-italic text-muted-foreground/50">{text.length.toLocaleString()} chars</span>
+          <span className="not-italic text-muted-foreground">{text.length.toLocaleString()} chars</span>
         </MarkerContent>
       </CollapsibleTrigger>
       <CollapsibleContent>
         <div className="py-1.5 pl-5">
-          <div className="prose prose-sm dark:prose-invert max-w-none rounded-lg border border-violet-500/20 bg-violet-500/[0.03] px-3 py-2 text-[13px] leading-relaxed text-muted-foreground [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+          <div className="prose prose-sm dark:prose-invert max-w-none rounded-lg border border-violet-500/20 bg-violet-500/[0.03] px-3 py-2 text-label leading-relaxed text-muted-foreground [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
             <MemoizedMarkdown>{text}</MemoizedMarkdown>
           </div>
         </div>
@@ -349,7 +349,7 @@ export function ErrorMessage({ item }: { item: TimelineItem }) {
       <BubbleContent>
         <div className="flex items-start gap-2">
           <CircleAlert className="mt-0.5 size-3.5 shrink-0" />
-          <pre className="whitespace-pre-wrap break-words text-xs">{item.content ?? ""}</pre>
+          <pre className="whitespace-pre-wrap break-words text-caption">{item.content ?? ""}</pre>
         </div>
       </BubbleContent>
     </Bubble>

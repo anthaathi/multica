@@ -32,7 +32,7 @@ export function SyncIssueButton({ issueId }: { issueId: string }) {
     <Button
       variant="outline"
       size="sm"
-      className="h-6 gap-1 px-2 text-xs"
+      className="h-6 gap-1 px-2 text-caption"
       onClick={handleSync}
       disabled={loading}
     >

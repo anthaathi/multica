@@ -361,7 +361,7 @@ export function ProjectResourcesSection({ projectId }: { projectId: string }) {
                 }}
               />
               <div className="pt-1 border-t">
-                <div className="flex items-center gap-1.5 py-1 text-[10px] font-medium text-muted-foreground">
+                <div className="flex items-center gap-1.5 py-1 text-micro font-medium text-muted-foreground">
                   <GitLabMark className="size-3" />
                   {t(($) => $.resources.gitlab_label)}
                 </div>
@@ -469,7 +469,7 @@ function ResourceRow({
     const display = resource.label || (ref.ref ? `${ref.url} @ ${ref.ref}` : ref.url);
     const tooltip = ref.ref ? `${ref.url}\nref: ${ref.ref}` : ref.url;
     return (
-      <div className="flex items-center gap-2 text-xs group">
+      <div className="flex items-center gap-2 text-caption group">
         <GitLabMark className="size-3.5 text-muted-foreground shrink-0" />
         <Tooltip>
           <TooltipTrigger

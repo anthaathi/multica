@@ -205,8 +205,8 @@ export function IntegrationsTab({ agent }: { agent: Agent }) {
             <MessageSquareText className="h-4 w-4" />
           </span>
           <div className="min-w-0 flex-1 space-y-1">
-            <h3 className="text-sm font-medium">{ts(($) => $.mattermost.section_title)}</h3>
-            <p className="text-xs leading-relaxed text-muted-foreground">
+            <h3 className="text-body font-medium">{ts(($) => $.mattermost.section_title)}</h3>
+            <p className="text-caption leading-relaxed text-muted-foreground">
               {ts(($) => $.mattermost.page_description)}
             </p>
           </div>
@@ -216,17 +216,17 @@ export function IntegrationsTab({ agent }: { agent: Agent }) {
             // Mattermost install/revoke stay workspace owner/admin-only, so an
             // agent owner who is not an admin only gets the read-only note
             // here (same as Slack above).
-            <p className="text-xs text-muted-foreground">
+            <p className="text-caption text-muted-foreground">
               {t(($) => $.tab_body.integrations.members_note)}
             </p>
           ) : !mattermostConfigured ? (
-            <p className="text-xs text-muted-foreground">
+            <p className="text-caption text-muted-foreground">
               {ts(($) => $.mattermost.not_enabled_title)}
             </p>
           ) : !mattermostInstallSupported && !mattermostHasActiveInstall ? (
             <div className="space-y-1">
-              <p className="text-xs font-medium">{ts(($) => $.mattermost.preview_title)}</p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-caption font-medium">{ts(($) => $.mattermost.preview_title)}</p>
+              <p className="text-caption text-muted-foreground">
                 {ts(($) => $.mattermost.preview_description)}
               </p>
             </div>
