@@ -34,6 +34,44 @@ afterEach(() => {
 // app in past incidents. The contract is: a malformed response degrades to
 // an empty/safe shape, never throws into React.
 describe("ApiClient schema fallback", () => {
+  describe("GitHub repository import", () => {
+    it("falls back safely when installation or repository responses are malformed", async () => {
+      stubFetchJson({ installations: "not-an-array", configured: true });
+      const client = new ApiClient("https://api.example.test");
+      await expect(client.listGitHubInstallations("ws-1")).resolves.toEqual({
+        installations: [],
+        configured: false,
+        repository_browse_configured: false,
+        can_manage: false,
+      });
+
+      stubFetchJson({ repositories: [{ id: "wrong-type" }] });
+      await expect(
+        client.listGitHubInstallationRepositories("ws-1", "installation-1"),
+      ).resolves.toEqual({
+        repositories: [],
+        total_count: 0,
+        next_page: null,
+      });
+    });
+
+    it("adds the allowlisted repository return target to the connect request", async () => {
+      stubFetchJson({
+        configured: true,
+        url: "https://github.com/apps/multica/installations/new",
+      });
+      const client = new ApiClient("https://api.example.test");
+
+      await client.getGitHubConnectURL("ws-1", "repositories");
+
+      const fetchMock = vi.mocked(fetch);
+      expect(fetchMock).toHaveBeenCalledWith(
+        "https://api.example.test/api/workspaces/ws-1/github/connect?return_to=repositories",
+        expect.any(Object),
+      );
+    });
+  });
+
   describe("listTimeline", () => {
     it("falls back to an empty array when the body is null", async () => {
       stubFetchJson(null);
@@ -462,6 +500,35 @@ describe("ApiClient schema fallback", () => {
       const detail = await client.getAutopilotDelivery("ap-1", "d-1");
       expect(detail.id).toBe("d-1");
       expect(detail.autopilot_id).toBe("ap-1");
+    });
+  });
+
+  describe("listAgentBuilderSessions", () => {
+    it("falls back to no drafts when the response is malformed", async () => {
+      stubFetchJson({ unexpected: "shape" });
+      const client = new ApiClient("https://api.example.test");
+      expect(await client.listAgentBuilderSessions()).toEqual([]);
+    });
+
+    // Losing the whole row would lose the conversation. A draft missing its
+    // runtime degrades to "let the user pick one" instead.
+    it("keeps a draft whose runtime the server omitted", async () => {
+      stubFetchJson({
+        sessions: [{ session_id: "s-1", title: "Create an agent" }],
+      });
+      const client = new ApiClient("https://api.example.test");
+      const sessions = await client.listAgentBuilderSessions();
+      expect(sessions).toHaveLength(1);
+      expect(sessions[0]?.session_id).toBe("s-1");
+      expect(sessions[0]?.runtime_id).toBe("");
+    });
+
+    // An installed desktop build can outrun a self-hosted backend. Without this
+    // the Agents page would error instead of simply offering no drafts.
+    it("treats a 404 from an older backend as no drafts", async () => {
+      stubFetchJson({ error: "not found" }, 404);
+      const client = new ApiClient("https://api.example.test");
+      expect(await client.listAgentBuilderSessions()).toEqual([]);
     });
   });
 

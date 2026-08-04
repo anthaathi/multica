@@ -118,6 +118,7 @@ export const RUNTIME_PROFILE_PROTOCOL_FAMILIES = [
   "kiro",
   "antigravity",
   "qoder",
+  "qoderclicn",
   "traecli",
   "omp",
   "grok",
@@ -373,7 +374,16 @@ export interface AgentTask {
 export interface Agent {
   id: string;
   workspace_id: string;
+  /**
+   * Empty string when the agent is unbound: it kept its configuration, chats and
+   * task history when its runtime was deleted, and needs a new runtime before it
+   * can run again (MUL-5559). Use `isAgentRuntimeBound` so additive and legacy
+   * signals stay compatible, and do not confuse it with a bound-but-offline
+   * runtime — that one just needs the machine back.
+   */
   runtime_id: string;
+  /** False exactly when the agent has no runtime. Older backends omit it. */
+  runtime_bound?: boolean;
   name: string;
   description: string;
   instructions: string;
@@ -385,7 +395,7 @@ export interface Agent {
    * Coarse metadata signalling whether the agent has any custom env
    * vars configured, without exposing the keys or values. Reads of
    * the real map go through the dedicated `GET /api/agents/{id}/env`
-   * endpoint (owner/admin only, audited). MUL-2600.
+   * endpoint (agent owner or workspace owner/admin, audited). MUL-2600.
    *
    * Optional in the type so older backends (pre-MUL-2600) that omit
    * the field don't crash the renderer; downstream code should treat
@@ -553,6 +563,54 @@ export interface AgentBuilderSession {
   runtime_id: string;
 }
 
+/** Who may invoke the agent being created, as the creation form models it. */
+export type AgentPermissionScope = "private" | "workspace" | "members";
+
+/**
+ * The wire form of an in-progress agent configuration.
+ *
+ * Differs from the editable draft in two deliberate ways: `Set` becomes an
+ * array (JSON has no sets), and there is no runtime — which runtime a
+ * conversation executes on is owned by its carrier agent server-side, and a
+ * copy here could only go stale. `applied_message_id` travels along because it
+ * is what stops a restore from re-applying the last reply's `<agent_draft>`
+ * over edits the user made after it.
+ */
+export interface StoredAgentDraft {
+  name: string;
+  description: string;
+  instructions: string;
+  avatar_url: string | null;
+  model: string;
+  thinking_level: string;
+  service_tier: string;
+  skill_ids: string[];
+  permission_scope: AgentPermissionScope;
+  member_ids: string[];
+  team_ids: string[];
+  applied_message_id: string | null;
+}
+
+/** One unfinished agent-creation conversation, as listed by the studio. */
+export interface AgentBuilderSessionSummary {
+  session_id: string;
+  title: string;
+  /** The carrier's runtime — where this conversation actually executes. The
+   *  picker seeds from it so it can never disagree with what answers the next
+   *  message (MUL-5163). */
+  runtime_id: string;
+  created_at: string;
+  updated_at: string;
+  /** Still in the builder wire format; decode with the builder protocol helpers
+   *  before showing it to a human. */
+  last_message_content: string;
+  last_message_role: string;
+  last_message_at: string;
+  /** The stored configuration, or null when the conversation has never been
+   *  hand-edited — the client then replays the last `<agent_draft>` block. */
+  draft?: StoredAgentDraft | null;
+}
+
 /** Result of rebinding a live builder conversation to another runtime.
  *  `runtime_id` is the runtime the server actually bound — the caller must
  *  wait for it before showing the new runtime as selected. */
@@ -650,8 +708,9 @@ export interface UpdateAgentRequest {
   /**
    * NOTE: `custom_env` is intentionally NOT updatable through this
    * request shape. Env edits flow through `client.updateAgentEnv` /
-   * `PUT /api/agents/{id}/env` — that path is owner/admin only,
-   * denies agent actors, and writes a persistent audit row. The
+   * `PUT /api/agents/{id}/env` — that path admits the agent owner or a
+   * workspace owner/admin, denies agent actors, and writes a
+   * persistent audit row. The
    * server REJECTS any `PUT /api/agents/{id}` body that includes
    * `custom_env` with a 400; do not put the field in this payload.
    * MUL-2600.
@@ -936,6 +995,32 @@ export interface DashboardRunTimeDaily {
   failed_count: number;
 }
 
+// One (date, failure_reason) bucket of terminal-task counts for the workspace
+// dashboard's Errors metric.
+//
+// `failure_reason` carries the backend's canonical failure taxonomy (the 21
+// `taskfailure.Reason` values, plus `"unclassified"` for failed rows with an
+// empty column) — EXCEPT for the empty string, which is the *succeeded*
+// bucket. Shipping successes in the same series is deliberate: the error rate
+// then has a denominator built on exactly the same filters as its numerator.
+// `DashboardRunTimeDaily.task_count` is NOT a safe denominator here, because
+// it only counts tasks that actually started and a queue-expired task never
+// does.
+export interface DashboardFailureDaily {
+  date: string;
+  failure_reason: string;
+  task_count: number;
+}
+
+// Per-(agent, failure_reason) terminal-task counts. Same succeeded-bucket
+// convention as DashboardFailureDaily, so the client can rank agents by
+// failure rate rather than by raw failure count.
+export interface DashboardFailureByAgent {
+  agent_id: string;
+  failure_reason: string;
+  task_count: number;
+}
+
 export type RuntimeUpdateStatus =
   | "pending"
   | "running"
@@ -1016,6 +1101,15 @@ export interface RuntimeModelListRequest {
   error?: string;
   created_at: string;
   updated_at: string;
+  /**
+   * True when the server answered from its own catalog cache instead of a live
+   * daemon round trip (MUL-5444). Informational only: such a response already
+   * arrives with `status: "completed"` and a populated `models`, so callers
+   * that ignore this field behave exactly as before. `cached_at` is the
+   * snapshot's capture time.
+   */
+  cached?: boolean;
+  cached_at?: string;
 }
 
 // Result shape returned by resolveRuntimeModels — includes the
@@ -1024,6 +1118,15 @@ export interface RuntimeModelListRequest {
 export interface RuntimeModelsResult {
   models: RuntimeModel[];
   supported: boolean;
+  /**
+   * True when the server answered from its catalog cache rather than a live
+   * daemon round trip (MUL-5444). Drives the query's freshness policy: a
+   * cached answer is immediately revalidatable so the client never extends the
+   * server's staleness window.
+   */
+  cached?: boolean;
+  /** Capture time of the served snapshot, when the answer was cached. */
+  cachedAt?: string;
 }
 
 export type RuntimeLocalSkillStatus =

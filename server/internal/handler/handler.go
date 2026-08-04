@@ -7,9 +7,11 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"math"
 	"net/http"
 	"net/netip"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -141,6 +143,15 @@ type WorkspaceSetRefreshNotifier interface {
 	NotifyWorkspacesChanged(userID string)
 }
 
+// DaemonPendingWorkNotifier pushes a runtime-scoped "heartbeat now" hint to the
+// daemon so a queued heartbeat-carried request (model discovery) is picked up
+// immediately instead of on the daemon's next scheduled tick (MUL-5444).
+// Satisfied by both *daemonws.Hub (single-node) and *daemonws.RelayNotifier
+// (multi-node, fans out through Redis).
+type DaemonPendingWorkNotifier interface {
+	NotifyPendingWork(runtimeID, kind string)
+}
+
 type Handler struct {
 	Queries                *db.Queries
 	DB                     dbExecutor
@@ -164,6 +175,16 @@ type Handler struct {
 	Storage                storage.Storage
 	CFSigner               *auth.CloudFrontSigner
 	Analytics              analytics.Client
+	// DaemonPendingWork pushes "heartbeat now" hints for queued
+	// heartbeat-carried requests (MUL-5444). Optional: when nil,
+	// requestDaemonPendingWork falls back to the local DaemonHub, which is the
+	// correct delivery scope for a single-node deployment.
+	DaemonPendingWork DaemonPendingWorkNotifier
+	// ModelCatalogCache serves the last known good model list for a runtime so
+	// the picker can render without waiting for a daemon round trip
+	// (stale-while-revalidate, MUL-5444). Nil-safe: every call site treats a nil
+	// cache as a permanent miss and falls back to the full discovery flow.
+	ModelCatalogCache ModelCatalogCache
 	// Metrics is the shared business-metrics collector built by main.go.
 	// May be nil in tests / self-hosted with the metrics listener disabled;
 	// every Record* method is nil-safe and obsmetrics.RecordEvent treats a
@@ -222,6 +243,11 @@ type Handler struct {
 	// delivering events, to flush debounced run triggers and join in-flight
 	// reply goroutines. Built unconditionally (even without Lark).
 	ChannelRouter *engine.Router
+	// ChannelMediaReconciler settles the channel-media intent ledger
+	// (uploaded-but-unbound object reclaim). Built in cmd/server/router.go
+	// where the storage backend exists; main.go starts it as an independent
+	// worker goroutine. Nil when no storage backend is configured.
+	ChannelMediaReconciler *service.ChannelMediaReconciler
 	// SlackInstall owns the bring-your-own-app Slack install lifecycle (register
 	// pasted tokens / list / revoke) and the at-rest encryption of each app's bot
 	// + app tokens (MUL-3666). Nil unless MULTICA_SLACK_SECRET_KEY is set.
@@ -319,8 +345,18 @@ func New(queries *db.Queries, txStarter txStarter, hub *realtime.Hub, bus *event
 		daemonWorkspaceRefresh = daemonHub
 	}
 
+	llmClient := llm.New(llm.Config{
+		APIKey:       cfg.LLMAPIKey,
+		BaseURL:      cfg.LLMBaseURL,
+		DefaultModel: cfg.LLMDefaultModel,
+	})
+
 	taskSvc := service.NewTaskService(queries, txStarter, hub, bus, daemonHub)
 	taskSvc.Analytics = analyticsClient
+	// Chat follow-up suggestions run through the same internal LLM layer that
+	// backs auto-titling. A deployment with no MULTICA_LLM_* configuration gets
+	// a disabled client, which turns the feature off rather than failing.
+	taskSvc.QuickActions = llmClient
 	h := &Handler{
 		Queries:                      queries,
 		DB:                           executor,
@@ -336,6 +372,7 @@ func New(queries *db.Queries, txStarter txStarter, hub *realtime.Hub, bus *event
 		EmailService:                 emailService,
 		UpdateStore:                  NewInMemoryUpdateStore(),
 		ModelListStore:               NewInMemoryModelListStore(),
+		ModelCatalogCache:            NewInMemoryModelCatalogCache(),
 		LocalSkillListStore:          NewInMemoryLocalSkillListStore(),
 		LocalSkillImportStore:        NewInMemoryLocalSkillImportStore(),
 		LivenessStore:                NewNoopLivenessStore(),
@@ -350,11 +387,7 @@ func New(queries *db.Queries, txStarter txStarter, hub *realtime.Hub, bus *event
 			BaseURL: cfg.CloudRuntimeFleetURL,
 			Timeout: cfg.CloudRuntimeFleetTimeout,
 		}),
-		LLM: llm.New(llm.Config{
-			APIKey:       cfg.LLMAPIKey,
-			BaseURL:      cfg.LLMBaseURL,
-			DefaultModel: cfg.LLMDefaultModel,
-		}),
+		LLM: llmClient,
 		cfg: cfg,
 	}
 	h.WebhookDeliveryWorker = NewWebhookDeliveryWorker(h)
@@ -820,6 +853,12 @@ func (h *Handler) loadIssueForUser(w http.ResponseWriter, r *http.Request, issue
 }
 
 // resolveIssueByIdentifier tries to look up an issue by "PREFIX-NUMBER" format.
+//
+// The prefix must match the workspace's own issue prefix, the same rule
+// `lookupIssueByIdentifier` applies to VCS webhooks. Without it every prefix
+// resolved to the same issue number, so `FOO-134` and `TRS-134` were
+// interchangeable — which makes the identifier URL `/{ws}/issues/{key}`
+// unusable as a canonical link.
 func (h *Handler) resolveIssueByIdentifier(ctx context.Context, id, workspaceID string) (db.Issue, bool) {
 	parts := splitIdentifier(id)
 	if parts == nil {
@@ -830,6 +869,11 @@ func (h *Handler) resolveIssueByIdentifier(ctx context.Context, id, workspaceID 
 	}
 	wsUUID, err := util.ParseUUID(workspaceID)
 	if err != nil {
+		return db.Issue{}, false
+	}
+	// Case-insensitive: a hand-typed `trs-134` should open `TRS-134`.
+	prefix := h.getIssuePrefix(ctx, wsUUID)
+	if prefix == "" || !strings.EqualFold(parts.prefix, prefix) {
 		return db.Issue{}, false
 	}
 	issue, err := h.Queries.GetIssueByNumber(ctx, db.GetIssueByNumberParams{
@@ -865,6 +909,12 @@ func splitIdentifier(id string) *identifierParts {
 			return nil
 		}
 		num = num*10 + int(c-'0')
+		// Guard the int32 conversion below: a UUID whose last group happens to
+		// be all digits ("…-421234567890") reaches here and would otherwise be
+		// truncated into a plausible-looking issue number.
+		if num > math.MaxInt32 {
+			return nil
+		}
 	}
 	if num <= 0 {
 		return nil
