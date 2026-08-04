@@ -17,3 +17,4 @@ qwen
 qodercli
 qoderclicn
 traecli
+qwenpaw
