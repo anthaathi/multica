@@ -31,6 +31,7 @@ import (
 	db "github.com/multica-ai/multica/server/pkg/db/generated"
 	"github.com/multica-ai/multica/server/pkg/protocol"
 	"github.com/multica-ai/multica/server/pkg/redact"
+	"github.com/multica-ai/multica/server/pkg/taskfailure"
 )
 
 // ---------------------------------------------------------------------------
@@ -2139,8 +2140,17 @@ func (h *Handler) buildClaimedTaskResponse(r *http.Request, task *db.AgentTaskQu
 			// chat_history.go wires both h.SlackHistory and h.MattermostHistory,
 			// so Slack and Mattermost get the flag; other channels (Feishu,
 			// WeCom) have no reader, so the flag must not imply one exists.
+			//
+			// chat_type rides along on the same row. It is what lets the
+			// per-turn prompt tell the agent whether this chat_session is a
+			// room shared by many people or a 1:1 with the bot; the prompt used
+			// to describe every chat run as a private 1:1 whatever the room. The
+			// shared session service writes the column for every channel
+			// (channel/engine/session.go), so no channel needs naming here
+			// either.
 			if binding, berr := h.Queries.GetChannelChatSessionBindingBySessionAny(r.Context(), cs.ID); berr == nil {
 				resp.ChatChannelType = binding.ChannelType
+				resp.ChatType = binding.ChatType
 				if binding.ChannelType == string(slack.TypeSlack) || binding.ChannelType == string(mattermost.TypeMattermost) {
 					// The latest trigger was a thread reply iff its reply-target
 					// thread (last_thread_id) differs from its own message id (a
@@ -2250,7 +2260,7 @@ func (h *Handler) buildClaimedTaskResponse(r *http.Request, task *db.AgentTaskQu
 			var inputLoadErr error
 			if task.ChatInputTaskID.Valid {
 				unanswered, inputLoadErr = h.Queries.ListChatInputMessages(r.Context(), task.ChatInputTaskID)
-			} else if msgs, err := h.Queries.ListChatMessages(r.Context(), cs.ID); err == nil {
+			} else if msgs, err := h.Queries.ListChatMessagesForLegacyTask(r.Context(), cs.ID); err == nil {
 				unanswered = trailingUserMessages(msgs)
 			} else {
 				inputLoadErr = err
@@ -2984,6 +2994,33 @@ func (h *Handler) CompleteTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// GH #6402: a daemon whose backend does not (yet) read the provider's
+	// structured terminal reason reports a context-exhausted run as a clean
+	// success, with the CLI's "your context window is full" notice as the
+	// answer. Re-route it to the failure path here so the fix does not have to
+	// wait for every installed daemon to update: an un-upgraded host would
+	// otherwise keep publishing that notice as the agent's reply AND keep the
+	// dead session pinned as the resume pointer, which is a permanently stuck
+	// (agent, issue) pair rather than a mislabelled row. Same argument, and the
+	// same shared classifier, as taskfailure.NormalizeDaemonReason on the fail
+	// boundary (MUL-5370). A current daemon classifies this before it ever calls
+	// /complete, so this branch is dead weight for it — by design.
+	if taskfailure.ContextExhaustedCompletion(req.Output) {
+		slog.Warn("complete task: output is a provider context-exhaustion notice, recording as failed",
+			"task_id", taskID,
+			"failure_reason", taskfailure.ReasonAgentContextOverflow,
+		)
+		h.failTask(w, r, taskID, workspaceID, TaskFailRequest{
+			Error:                 req.Output,
+			FailureReason:         string(taskfailure.ReasonAgentContextOverflow),
+			SessionID:             req.SessionID,
+			WorkDir:               req.WorkDir,
+			SessionRolloutMissing: req.SessionRolloutMissing,
+			RetiredSessionID:      req.RetiredSessionID,
+		})
+		return
+	}
+
 	result, _ := json.Marshal(req)
 	// MUL-5305: SessionRolloutMissing is applied inside CompleteTask's terminal
 	// transaction (force session_id NULL + flag the row), so an auto-retry the
@@ -3644,6 +3681,15 @@ func (h *Handler) FailTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.failTask(w, r, taskID, workspaceID, req)
+}
+
+// failTask records a terminal failure and writes the response. Shared by the
+// /fail endpoint and by CompleteTask's context-exhaustion normalization so a
+// run re-classified at the /complete boundary lands through exactly the same
+// transaction, token revocation and runtime wake-up as one the daemon reported
+// as failed itself.
+func (h *Handler) failTask(w http.ResponseWriter, r *http.Request, taskID, workspaceID string, req TaskFailRequest) {
 	// MUL-5305: SessionRolloutMissing is applied inside FailTask's terminal
 	// transaction — forcing session_id NULL (overriding the COALESCE that would
 	// keep a stale mid-flight pin) and flagging the row in the same commit that
@@ -3917,8 +3963,52 @@ func (h *Handler) ListTasksByIssue(w http.ResponseWriter, r *http.Request) {
 	// issue-facing surface must resolve initiator/originator names (departed-safe,
 	// one batch) — otherwise the badge falls back to "someone" on issue detail.
 	h.hydrateTaskAttributions(r.Context(), attributionsOf(resp))
+	h.hydrateTaskUsage(r.Context(), issue.ID, resp)
 
 	writeJSON(w, http.StatusOK, resp)
+}
+
+// hydrateTaskUsage attaches each run's own token usage to the execution-log
+// rows. One query for the whole issue, then a map join — not one query per
+// task, which would be an N+1 over a list the UI always renders in full.
+//
+// Usage is display metadata: a failure here must not take the execution log
+// down with it, so the error is swallowed and every row keeps its nil Usage,
+// which the UI already renders as "no usage recorded".
+func (h *Handler) hydrateTaskUsage(ctx context.Context, issueID pgtype.UUID, resp []AgentTaskResponse) {
+	if len(resp) == 0 {
+		return
+	}
+
+	rows, err := h.Queries.ListIssueTaskUsage(ctx, issueID)
+	if err != nil || len(rows) == 0 {
+		return
+	}
+
+	byTask := make(map[string][]TaskUsageData, len(resp))
+	for _, row := range rows {
+		var cost *int64
+		if row.CostUsdTicks.Valid {
+			v := row.CostUsdTicks.Int64
+			cost = &v
+		}
+		taskID := uuidToString(row.TaskID)
+		byTask[taskID] = append(byTask[taskID], TaskUsageData{
+			Provider:         row.Provider,
+			Model:            row.Model,
+			InputTokens:      row.InputTokens,
+			OutputTokens:     row.OutputTokens,
+			CacheReadTokens:  row.CacheReadTokens,
+			CacheWriteTokens: row.CacheWriteTokens,
+			CostUsdTicks:     cost,
+		})
+	}
+
+	for i := range resp {
+		if usage, ok := byTask[resp[i].ID]; ok {
+			resp[i].Usage = usage
+		}
+	}
 }
 
 // ListTaskMessagesByUser returns task messages for a task.

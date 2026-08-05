@@ -75,3 +75,7 @@ data/
 .idea
 deploy.md
 .gstack/
+
+# Python (agent tooling)
+__pycache__/
+*.pyc

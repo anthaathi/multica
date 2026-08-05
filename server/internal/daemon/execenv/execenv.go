@@ -126,12 +126,12 @@ type TaskContextForEnv struct {
 	ProjectResources              []ProjectResourceForEnv // resources attached to the project
 	ChatSessionID                 string                  // non-empty for chat tasks
 	// ChatChannelType is the IM platform behind a chat session ("slack",
-	// "feishu"); empty for a web/mobile chat. The brief reads it for DELIVERY
-	// policy only: any non-empty value means the reply leaves Multica for an
-	// external channel, so `multica attachment upload` cannot deliver a file and
-	// the Output section says text-only instead (MUL-4899). The orthogonal
-	// history-command policy is Slack-only and lives in the per-turn chat prompt
-	// (daemon/prompt.go) — the server has no Feishu history reader.
+	// "feishu", "wecom"); empty for a web/mobile chat. Any non-empty value
+	// means the reply leaves Multica for an external channel, so `multica
+	// attachment upload` cannot deliver a file and the Output section says
+	// text-only instead (MUL-4899). The orthogonal audience and history policies
+	// live in the per-turn chat prompt (daemon/prompt.go) — the server has no
+	// history reader for any other channel.
 	ChatChannelType         string
 	AutopilotRunID          string // non-empty for autopilot run_only tasks
 	AutopilotID             string

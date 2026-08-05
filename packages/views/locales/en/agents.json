@@ -823,7 +823,13 @@
     "expand_visible": "Expand visible",
     "collapse_visible": "Collapse visible",
     "preserve_filters": "Preserve filters",
-    "default_expanded": "Open details by default"
+    "default_expanded": "Open details by default",
+    "details_input": "Input",
+    "details_output": "Output",
+    "details_cache_read": "Cache read",
+    "details_cache_write": "Cache write",
+    "details_cost": "Cost",
+    "usage_chip_title": "Tokens and estimated cost for this run"
   },
   "task_failure": {
     "agent_error": "Agent execution error",

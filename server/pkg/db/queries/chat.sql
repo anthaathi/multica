@@ -379,10 +379,15 @@ SELECT EXISTS (
 -- name: GetChannelMediaPendingUntil :one
 -- The latest unexpired media deadline gates a channel task. Using a durable
 -- task fire_at means a process restart still produces the placeholder fallback.
+-- Only a turn that can join a task's input batch may gate one: channel_command
+-- turns are excluded from the seal below, so an unrelated later message would
+-- otherwise wait out a command's media (or its whole fallback budget, since a
+-- command whose create failed never runs the binder that clears the marker).
 SELECT channel_media_pending_until
 FROM chat_message
 WHERE chat_session_id = $1
   AND role = 'user'
+  AND message_kind != 'channel_command'
   AND channel_media_pending_until > now()
 ORDER BY channel_media_pending_until DESC
 LIMIT 1;
@@ -401,11 +406,14 @@ WHERE id = $1 AND role = 'user';
 -- Seals the trailing channel-message batch to its task. The task row and these
 -- links are committed together, so an older in-flight task cannot absorb a
 -- newer media message and a later assistant row cannot hide that message.
+-- channel_command turns were already handled synchronously by Router; keeping
+-- them visible but unowned prevents both immediate and delayed re-execution.
 UPDATE chat_message AS message
 SET task_id = @task_id
 WHERE message.chat_session_id = @chat_session_id
   AND message.role = 'user'
   AND message.task_id IS NULL
+  AND message.message_kind != 'channel_command'
   AND NOT EXISTS (
       SELECT 1
       FROM chat_message AS prior
@@ -441,9 +449,82 @@ WHERE task_id = $1 AND role = 'user'
 RETURNING *;
 
 -- name: ListChatMessages :many
-SELECT * FROM chat_message
-WHERE chat_session_id = $1
-ORDER BY created_at ASC, id ASC;
+-- IMPORTANT: the visible-head selector below is also used by
+-- ListChatMessagesForLegacyTask, ListChatMessagesPage,
+-- ReanchorClaimedDirectChatInput, ReanchorNextQueuedDirectChatInput,
+-- ListPendingChatTasksForSession, and CancelQueuedAgentTasksForSession in
+-- agent.sql. Keep the eligible statuses and ordering identical: a claimed task
+-- is current, a deferred retry precedes still-queued work, and queued peers use
+-- claim priority/FIFO order. Background quick-action regeneration is invisible.
+-- This is a presentation/visibility order, not a scheduling guarantee:
+-- deferred rows are not claimable before promotion, so a queued row may be
+-- claimed during the backoff and then becomes the visible claimed head.
+SELECT message.* FROM chat_message AS message
+WHERE message.chat_session_id = $1
+  AND NOT (
+    message.role = 'user'
+    AND EXISTS (
+      SELECT 1
+      FROM agent_task_queue AS task
+      WHERE task.chat_session_id = message.chat_session_id
+        AND task.status = 'queued'
+        AND task.id = message.task_id
+        -- "Queued follow-up" is positional, not the row's transient status:
+        -- the first pending task is the current turn even before claim.
+        AND task.id <> (
+          SELECT head.id
+          FROM agent_task_queue AS head
+          WHERE head.chat_session_id = $1
+            AND head.status IN ('queued', 'dispatched', 'running', 'waiting_local_directory', 'deferred')
+            AND head.regenerate_quick_actions_for IS NULL
+          ORDER BY
+            CASE
+              WHEN head.status IN ('dispatched', 'running', 'waiting_local_directory') THEN 0
+              WHEN head.status = 'deferred' THEN 1
+              ELSE 2
+            END,
+            head.priority DESC,
+            head.created_at ASC,
+            head.id ASC
+          LIMIT 1
+        )
+    )
+  )
+ORDER BY message.created_at ASC, message.id ASC;
+
+-- name: ListChatMessagesForLegacyTask :many
+-- Legacy/reclaimed daemon tasks use trailing history, but must not absorb a
+-- newer queued successor that is already bound to its own user message.
+SELECT message.* FROM chat_message AS message
+WHERE message.chat_session_id = $1
+  AND NOT (
+    message.role = 'user'
+    AND EXISTS (
+      SELECT 1
+      FROM agent_task_queue AS task
+      WHERE task.chat_session_id = message.chat_session_id
+        AND task.status = 'queued'
+        AND task.id = message.task_id
+        AND task.id <> (
+          SELECT head.id
+          FROM agent_task_queue AS head
+          WHERE head.chat_session_id = $1
+            AND head.status IN ('queued', 'dispatched', 'running', 'waiting_local_directory', 'deferred')
+            AND head.regenerate_quick_actions_for IS NULL
+          ORDER BY
+            CASE
+              WHEN head.status IN ('dispatched', 'running', 'waiting_local_directory') THEN 0
+              WHEN head.status = 'deferred' THEN 1
+              ELSE 2
+            END,
+            head.priority DESC,
+            head.created_at ASC,
+            head.id ASC
+          LIMIT 1
+        )
+    )
+  )
+ORDER BY message.created_at ASC, message.id ASC;
 
 -- name: ListChatInputMessages :many
 -- Loads the immutable user-message input batch owned by a direct-chat task.
@@ -452,19 +533,168 @@ ORDER BY created_at ASC, id ASC;
 -- the user sent for this turn — and never absorbs a message that arrived after
 -- the batch was sealed, no matter what the assistant wrote or when. Only used
 -- for new task-owned direct-chat tasks; legacy/channel (chat_input_task_id
--- NULL) tasks keep using ListChatMessages + trailingUserMessages.
+-- NULL) tasks keep using ListChatMessagesForLegacyTask + trailingUserMessages.
 SELECT * FROM chat_message
 WHERE task_id = $1 AND role = 'user'
 ORDER BY created_at ASC, id ASC;
 
+-- name: ReanchorClaimedDirectChatInput :exec
+-- An idle direct send is visible while it is the positional queue head. A
+-- older/pre-deploy follow-up whose enqueue timestamp puts it before a newer
+-- settled reply can still reach claim; this is the fallback that moves only
+-- that out-of-order user row to the new turn boundary. In-order visible heads
+-- keep their original timestamp, so an idle send already returned to a cursor
+-- client never moves merely because a daemon claimed it.
+--
+-- The task's own created_at remains immutable and continues to drive queue
+-- FIFO, wait duration, and elapsed time. Only the message timestamp changes,
+-- preserving the existing public ordering/cursor contract for older clients.
+-- Add one microsecond when the DB clock ties the latest visible row so UUID
+-- ordering can never put the new user turn before the previous assistant row.
+--
+-- channel_ingested excludes sealed Slack/Lark batches, which can own multiple
+-- user rows and must preserve their original provider order. A direct send
+-- owns exactly one non-channel user row today; if direct batching is added,
+-- this query must assign a stable per-row offset instead of one timestamp.
+-- Retry children are excluded by the caller because their chat_input_task_id
+-- names the root task rather than themselves. Stale dispatched reclaim bypasses
+-- this query, so re-delivery does not move an already-visible turn.
+--
+-- Lock order is task row first (ClaimAgentTask), then this non-FK message-only
+-- update. The visibility subqueries take no row locks, avoiding an inverse
+-- message -> task lock edge with send/completion transactions.
+WITH latest_visible AS (
+    SELECT
+        claimed_input.id AS claimed_input_id,
+        claimed_input.created_at AS input_created_at,
+        prior.created_at AS prior_created_at
+    FROM chat_message AS claimed_input
+    CROSS JOIN LATERAL (
+        SELECT prior.created_at
+        FROM chat_message AS prior
+        WHERE prior.chat_session_id = claimed_input.chat_session_id
+          AND prior.id != claimed_input.id
+          AND NOT (
+            prior.role = 'user'
+            AND EXISTS (
+              SELECT 1
+              FROM agent_task_queue AS queued_task
+              WHERE queued_task.chat_session_id = prior.chat_session_id
+                AND queued_task.status = 'queued'
+                AND queued_task.id = prior.task_id
+                AND queued_task.id <> (
+                  SELECT head.id
+                  FROM agent_task_queue AS head
+                  WHERE head.chat_session_id = claimed_input.chat_session_id
+                    AND head.status IN ('queued', 'dispatched', 'running', 'waiting_local_directory', 'deferred')
+                    AND head.regenerate_quick_actions_for IS NULL
+                  ORDER BY
+                    CASE
+                      WHEN head.status IN ('dispatched', 'running', 'waiting_local_directory') THEN 0
+                      WHEN head.status = 'deferred' THEN 1
+                      ELSE 2
+                    END,
+                    head.priority DESC,
+                    head.created_at ASC,
+                    head.id ASC
+                  LIMIT 1
+                )
+            )
+          )
+        ORDER BY prior.created_at DESC, prior.id DESC
+        LIMIT 1
+    ) AS prior
+    WHERE claimed_input.task_id = @task_id
+      AND claimed_input.role = 'user'
+      AND NOT claimed_input.channel_ingested
+)
+UPDATE chat_message AS claimed_input
+SET created_at = GREATEST(
+    @dispatched_at::timestamptz,
+    latest_visible.prior_created_at + interval '1 microsecond'
+)
+FROM latest_visible
+WHERE claimed_input.id = latest_visible.claimed_input_id
+  AND latest_visible.prior_created_at >= latest_visible.input_created_at;
+
+-- name: ReanchorNextQueuedDirectChatInput :exec
+-- An assistant outcome can make the next queued direct task the positional
+-- head before a daemon claims it (MUL-5750). Its user row was persisted before
+-- this reply, so move that still-hidden single-row input just after the reply.
+-- Callers run this immediately after CreateChatMessage in the same transaction:
+-- readers see either the old active head without the reply, or the settled
+-- reply followed by the newly-visible head — never user B before assistant A.
+-- Channel batches are excluded because their immutable provider ordering may
+-- contain multiple user rows. Direct chat currently owns exactly one row; if
+-- direct batching is added, assign stable per-row offsets here.
+UPDATE chat_message AS queued_input
+SET created_at = sqlc.arg('assistant_created_at')::timestamptz + interval '1 microsecond'
+WHERE queued_input.chat_session_id = $1
+  AND queued_input.role = 'user'
+  AND NOT queued_input.channel_ingested
+  AND queued_input.created_at <= sqlc.arg('assistant_created_at')::timestamptz
+  AND EXISTS (
+    SELECT 1
+    FROM agent_task_queue AS queued_task
+    WHERE queued_task.id = queued_input.task_id
+      AND queued_task.chat_session_id = queued_input.chat_session_id
+      AND queued_task.status = 'queued'
+      AND queued_task.chat_input_task_id = queued_task.id
+      AND queued_task.regenerate_quick_actions_for IS NULL
+      AND queued_task.id = (
+        SELECT head.id
+        FROM agent_task_queue AS head
+        WHERE head.chat_session_id = queued_input.chat_session_id
+          AND head.status IN ('queued', 'dispatched', 'running', 'waiting_local_directory', 'deferred')
+          AND head.regenerate_quick_actions_for IS NULL
+        ORDER BY
+          CASE
+            WHEN head.status IN ('dispatched', 'running', 'waiting_local_directory') THEN 0
+            WHEN head.status = 'deferred' THEN 1
+            ELSE 2
+          END,
+          head.priority DESC,
+          head.created_at ASC,
+          head.id ASC
+        LIMIT 1
+      )
+  );
+
 -- name: ListChatMessagesPage :many
-SELECT * FROM chat_message
-WHERE chat_session_id = $1
+SELECT message.* FROM chat_message AS message
+WHERE message.chat_session_id = $1
+  AND NOT (
+    message.role = 'user'
+    AND EXISTS (
+      SELECT 1
+      FROM agent_task_queue AS task
+      WHERE task.chat_session_id = message.chat_session_id
+        AND task.status = 'queued'
+        AND task.id = message.task_id
+        AND task.id <> (
+          SELECT head.id
+          FROM agent_task_queue AS head
+          WHERE head.chat_session_id = $1
+            AND head.status IN ('queued', 'dispatched', 'running', 'waiting_local_directory', 'deferred')
+            AND head.regenerate_quick_actions_for IS NULL
+          ORDER BY
+            CASE
+              WHEN head.status IN ('dispatched', 'running', 'waiting_local_directory') THEN 0
+              WHEN head.status = 'deferred' THEN 1
+              ELSE 2
+            END,
+            head.priority DESC,
+            head.created_at ASC,
+            head.id ASC
+          LIMIT 1
+        )
+    )
+  )
   AND (
     sqlc.narg('before_created_at')::timestamptz IS NULL
-    OR (created_at, id) < (sqlc.narg('before_created_at')::timestamptz, sqlc.narg('before_id')::uuid)
+    OR (message.created_at, message.id) < (sqlc.narg('before_created_at')::timestamptz, sqlc.narg('before_id')::uuid)
   )
-ORDER BY created_at DESC, id DESC
+ORDER BY message.created_at DESC, message.id DESC
 LIMIT $2;
 
 -- name: GetChatMessage :one
@@ -500,7 +730,10 @@ RETURNING *;
 -- name: PromoteChannelChatTasksIfMediaReady :many
 -- Media completion may race with the 3s run batcher. Promote every original
 -- channel task waiting for this session only after all unexpired media markers
--- are gone; retry/escalation/direct-chat deferred tasks are excluded.
+-- are gone; retry/escalation/direct-chat deferred tasks are excluded. The
+-- marker scan uses the same population as GetChannelMediaPendingUntil and the
+-- seal: a channel_command turn belongs to no batch, so it must not hold a
+-- deferred task back either.
 UPDATE agent_task_queue AS task
 SET status = 'queued', fire_at = NULL
 WHERE task.chat_session_id = @chat_session_id
@@ -513,6 +746,7 @@ WHERE task.chat_session_id = @chat_session_id
       FROM chat_message AS message
       WHERE message.chat_session_id = @chat_session_id
         AND message.role = 'user'
+        AND message.message_kind != 'channel_command'
         AND message.channel_media_pending_until > now()
   )
 RETURNING task.*;
@@ -570,6 +804,19 @@ WITH retired_sessions AS (
     FROM agent_task_queue r
     WHERE r.chat_session_id = $1
       AND r.retired_session_id IS NOT NULL
+), resume_overflow_at AS (
+    -- completed_at alone, where the issue-side twin coalesces four columns:
+    -- this query already selects and orders by bare completed_at throughout,
+    -- so the cutoff has to be measured on the same clock as the values it is
+    -- compared against. Change both halves together if that ever moves.
+    SELECT MAX(t.completed_at) AS at
+    FROM agent_task_queue t
+    WHERE t.chat_session_id = $1
+      AND t.status = 'failed'
+      AND (
+        COALESCE(t.failure_reason, '') = 'codex_resume_oversized'
+        OR (COALESCE(t.error, '') ILIKE '%thread/resume failed%' AND COALESCE(t.error, '') ILIKE '%token too long%')
+      )
 ), latest_per_session AS (
     SELECT DISTINCT ON (t.session_id)
         t.session_id, t.work_dir, t.runtime_id, t.status, t.failure_reason, t.error, t.completed_at
@@ -585,11 +832,20 @@ WHERE session_id NOT IN (SELECT session_id FROM retired_sessions)
     status IN ('completed', 'cancelled')
     OR (
       status = 'failed'
-      AND COALESCE(failure_reason, '') NOT IN ('iteration_limit', 'agent_fallback_message', 'api_invalid_request', 'codex_semantic_inactivity', 'agent_error.context_overflow')
+      AND COALESCE(failure_reason, '') NOT IN ('iteration_limit', 'agent_fallback_message', 'api_invalid_request', 'codex_semantic_inactivity', 'agent_error.context_overflow', 'codex_resume_oversized')
       AND NOT (COALESCE(error, '') ILIKE '%400%' AND COALESCE(error, '') ILIKE '%invalid_request_error%')
       AND NOT (COALESCE(error, '') ~* 'must not be empty|must be non-?empty|must have non-?empty|non-?empty content|cannot be empty|should not be empty'
                AND COALESCE(error, '') ~* 'role[^a-z0-9]{0,2}assistant|assistant message|message at position|messages\.[0-9]|messages\[[0-9]')
     )
+  )
+  -- MUL-5722, mirroring GetLastTaskSession: an overflowed resume records no
+  -- session, so exclude by time instead of by matching the failed row. Note
+  -- this only guards the FALLBACK — the claim handler reads
+  -- chat_session.session_id first, so a pointer still naming the oversized
+  -- thread has to be cleared at fail time (see FailTask) to be covered.
+  AND (
+    (SELECT at FROM resume_overflow_at) IS NULL
+    OR completed_at > (SELECT at FROM resume_overflow_at)
   )
 ORDER BY completed_at DESC
 LIMIT 1;
@@ -616,6 +872,19 @@ SELECT EXISTS (
     AND status IN ('queued', 'dispatched', 'running', 'waiting_local_directory', 'deferred')
 ) AS has_active;
 
+-- name: HasPendingChatTurnForSession :one
+-- Position-only check for a direct send. Unlike GetPendingChatTask this is an
+-- EXISTS query and includes deferred retries: a new user turn must remain a
+-- follow-up while an older retry waits for its backoff, otherwise promotion of
+-- that retry would make the new message disappear from the visible transcript.
+-- Background quick-action regeneration owns no visible turn and is excluded.
+SELECT EXISTS (
+  SELECT 1 FROM agent_task_queue
+  WHERE chat_session_id = $1
+    AND status IN ('queued', 'dispatched', 'running', 'waiting_local_directory', 'deferred')
+    AND regenerate_quick_actions_for IS NULL
+) AS has_pending;
+
 -- name: GetPendingChatTask :one
 -- Returns the most recent in-flight task for a chat session, if any.
 -- Used by the frontend to recover pending state after refresh / reopen.
@@ -631,6 +900,89 @@ WHERE chat_session_id = $1 AND status IN ('queued', 'dispatched', 'running', 'wa
 ORDER BY created_at DESC
 LIMIT 1;
 
+-- name: ListPendingChatTasksForSession :many
+-- Returns a claimed task first, then a deferred retry, followed by prioritized
+-- then FIFO queued work. See the shared visible-head invariant above
+-- ListChatMessages; changing this order requires changing every selector named
+-- there in the same patch.
+-- The message lateral join reads only the immutable input owned by each task;
+-- it avoids loading the session's complete message history just to render a
+-- one-line queue preview. GetPendingChatTask remains for legacy callers that
+-- only need an existence check.
+SELECT
+    task.id,
+    task.status,
+    task.created_at,
+    message.id AS message_id,
+    COALESCE(message.content, '')::text AS content
+FROM agent_task_queue AS task
+LEFT JOIN LATERAL (
+    SELECT input.id, input.content
+    FROM chat_message AS input
+    WHERE input.task_id = COALESCE(task.chat_input_task_id, task.id)
+      AND input.role = 'user'
+    ORDER BY input.created_at ASC, input.id ASC
+    LIMIT 1
+) AS message ON TRUE
+WHERE task.chat_session_id = $1
+  AND task.status IN ('queued', 'dispatched', 'running', 'waiting_local_directory', 'deferred')
+  AND task.regenerate_quick_actions_for IS NULL
+ORDER BY
+    CASE
+      WHEN task.status IN ('dispatched', 'running', 'waiting_local_directory') THEN 0
+      WHEN task.status = 'deferred' THEN 1
+      ELSE 2
+    END,
+    task.priority DESC,
+    task.created_at ASC,
+    task.id ASC;
+
+-- name: PrioritizeQueuedChatTask :one
+WITH target AS MATERIALIZED (
+  SELECT candidate.id
+  FROM agent_task_queue AS candidate
+  WHERE candidate.id = sqlc.arg('id')
+    AND candidate.chat_session_id = sqlc.arg('chat_session_id')
+    AND candidate.status = 'queued'
+    -- "Send now" is valid only while there is a visible claimed task for the
+    -- client to cancel. If the visible head is still queued (or deferred), the
+    -- selected row would otherwise replace it without any active_task_id.
+    AND EXISTS (
+      SELECT 1
+      FROM agent_task_queue AS active
+      WHERE active.chat_session_id = sqlc.arg('chat_session_id')
+        AND active.status IN ('dispatched', 'running', 'waiting_local_directory')
+        AND active.regenerate_quick_actions_for IS NULL
+    )
+  FOR UPDATE
+), demoted AS (
+  UPDATE agent_task_queue AS queued
+  SET priority = 3
+  WHERE queued.chat_session_id = sqlc.arg('chat_session_id')
+    AND queued.id <> sqlc.arg('id')
+    AND queued.status = 'queued'
+    AND queued.priority >= 4
+    AND EXISTS (SELECT 1 FROM target)
+), prioritized AS (
+  UPDATE agent_task_queue AS selected
+  SET priority = 4
+  FROM target
+  WHERE selected.id = target.id
+  RETURNING selected.id
+)
+SELECT
+  prioritized.id AS task_id,
+  (
+    SELECT active.id
+    FROM agent_task_queue AS active
+    WHERE active.chat_session_id = sqlc.arg('chat_session_id')
+      AND active.status IN ('dispatched', 'running', 'waiting_local_directory')
+      AND active.regenerate_quick_actions_for IS NULL
+    ORDER BY active.created_at ASC, active.id ASC
+    LIMIT 1
+  )::uuid AS active_task_id
+FROM prioritized;
+
 -- name: ListPendingChatTasksByCreator :many
 -- Aggregate view of all in-flight chat tasks owned by a given creator in a
 -- workspace. Drives the FAB's "running" indicator when the chat window is
@@ -642,12 +994,12 @@ LIMIT 1;
 --
 -- atq.chat_session_id IS NOT NULL is redundant given the JOIN, but stated
 -- explicitly so the planner can prove the query predicate is a subset of the
--- idx_agent_task_queue_chat_pending_v2 partial-index predicate and use it.
+-- idx_agent_task_queue_chat_pending_v3 partial-index predicate and use it.
 SELECT atq.id AS task_id, atq.status, atq.chat_session_id, cs.agent_id
 FROM agent_task_queue atq
 JOIN chat_session cs ON cs.id = atq.chat_session_id
 WHERE atq.chat_session_id IS NOT NULL
-  AND atq.status IN ('queued', 'dispatched', 'running', 'waiting_local_directory')
+  AND atq.status IN ('queued', 'dispatched', 'running', 'waiting_local_directory', 'deferred')
   -- Exclude background quick-actions regeneration passes: they own no assistant
   -- turn and must not surface as "running" chat work (MUL-5149 refresh follow-up).
   AND atq.regenerate_quick_actions_for IS NULL
@@ -670,7 +1022,7 @@ SELECT EXISTS (
   FROM agent_task_queue atq
   JOIN chat_session cs ON cs.id = atq.chat_session_id
   WHERE atq.chat_session_id IS NOT NULL
-    AND atq.status IN ('queued', 'dispatched', 'running', 'waiting_local_directory')
+    AND atq.status IN ('queued', 'dispatched', 'running', 'waiting_local_directory', 'deferred')
     -- Background quick-actions regeneration passes own no visible turn and must
     -- never light the FAB "running" indicator (MUL-5149 refresh follow-up).
     AND atq.regenerate_quick_actions_for IS NULL
