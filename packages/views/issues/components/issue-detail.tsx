@@ -510,7 +510,7 @@ function ActivityBlock({
   if (!expanded) {
     const count = entries.length;
     return (
-      <div className="pb-3 px-4">
+      <div className="pb-3 px-4 max-md:px-3">
         <button
           type="button"
           onClick={onToggle}
@@ -536,7 +536,7 @@ function ActivityBlock({
   // fold the whole block back to a single count line.
   const showHeader = hiddenOlderCount === 0;
   return (
-    <div className="pb-3 px-4 flex flex-col gap-3">
+    <div className="pb-3 px-4 max-md:px-3 flex flex-col gap-3">
       {showHeader && (
         <button
           type="button"
@@ -1006,7 +1006,7 @@ export function IssueDetailSkeleton({ leading }: { leading?: ReactNode } = {}) {
         <div className="flex-1 overflow-y-auto [scrollbar-gutter:stable_both-edges]">
           {/* Gutters match the loaded column exactly (see its comment), so the
               skeleton doesn't reflow sideways when real content mounts. */}
-          <div className="mx-auto w-full max-w-4xl px-4 py-6 space-y-6 md:px-8 md:py-8">
+          <div className="mx-auto w-full max-w-4xl px-3 py-6 space-y-6 md:px-8 md:py-8">
             <Skeleton className="h-8 w-3/4" />
             <div className="space-y-2">
               <Skeleton className="h-4 w-full" />
@@ -2533,12 +2533,12 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
           className="relative flex-1 overflow-y-auto [scrollbar-gutter:stable_both-edges]"
         >
         {/* Gutters: 32px is a comfortable reading margin on a desktop column
-            but eats 16% of a 393px phone, so below `md` they drop to 16px.
+            but eats 16% of a 393px phone, so below `md` they drop to 12px.
             `max-md:pb-chat-launcher` reserves the launcher's corner at the end
             of the scroll: below `md` the composer is not pinned (see
             `useStickyComposer`), so it lands here — right where the launcher
             floats — once the reader scrolls to the bottom. */}
-        <div className="mx-auto w-full max-w-4xl px-4 py-6 max-md:pb-chat-launcher md:px-8 md:py-8">
+        <div className="mx-auto w-full max-w-4xl px-3 py-6 max-md:pb-chat-launcher md:px-8 md:py-8">
           {titleLazy.active && (
             <div className={titleLazy.ready ? undefined : "hidden"}>
               <TitleEditor

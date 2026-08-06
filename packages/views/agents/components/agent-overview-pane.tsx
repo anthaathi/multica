@@ -14,6 +14,7 @@ import { useWorkspaceId } from "@multica/core/hooks";
 import { larkInstallationsOptions } from "@multica/core/lark";
 import { slackInstallationsOptions } from "@multica/core/slack";
 import { mattermostInstallationsOptions } from "@multica/core/mattermost";
+import { dingtalkInstallationsOptions } from "@multica/core/dingtalk";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -176,11 +177,15 @@ export function AgentOverviewPane({
     ...mattermostInstallationsOptions(wsId),
     enabled: !!wsId,
   });
+  const { data: dingtalkListing } = useQuery({
+    ...dingtalkInstallationsOptions(wsId),
+  });
 
   const integrationsConfigured =
     larkListing?.configured === true ||
     slackListing?.configured === true ||
-    mattermostListing?.configured === true;
+    mattermostListing?.configured === true ||
+    dingtalkListing?.configured === true;
 
   const visibleCapabilityTabs = useMemo(() => {
     const showMcp = runtime

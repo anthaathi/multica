@@ -3,10 +3,11 @@ package protocol
 // Event types for WebSocket communication between server, web clients, and daemon.
 const (
 	// Issue events
-	EventIssueCreated         = "issue:created"
-	EventIssueUpdated         = "issue:updated"
-	EventIssueDeleted         = "issue:deleted"
-	EventIssueMetadataChanged = "issue_metadata:changed"
+	EventIssueCreated            = "issue:created"
+	EventIssueUpdated            = "issue:updated"
+	EventIssueDeleted            = "issue:deleted"
+	EventIssueMetadataChanged    = "issue_metadata:changed"
+	EventIssueAttachmentsChanged = "issue_attachments:changed"
 
 	// Comment events
 	EventCommentCreated       = "comment:created"
@@ -202,4 +203,8 @@ const (
 	// installations query on either.
 	EventMattermostInstallationCreated = "mattermost_installation:created"
 	EventMattermostInstallationRevoked = "mattermost_installation:revoked"
+	// DingTalk installation lifecycle follows the same create/revoke semantics
+	// as Slack's BYO channel installation.
+	EventDingTalkInstallationCreated = "dingtalk_installation:created"
+	EventDingTalkInstallationRevoked = "dingtalk_installation:revoked"
 )

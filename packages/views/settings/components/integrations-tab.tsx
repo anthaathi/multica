@@ -5,6 +5,7 @@ import { LarkTab } from "./lark-tab";
 import { ComposioTab } from "./composio-tab";
 import { SlackTab } from "./slack-tab";
 import { MattermostTab } from "./mattermost-tab";
+import { DingTalkTab } from "./dingtalk-tab";
 import { VCSTab } from "./vcs-tab";
 import { ApiError } from "@multica/core/api";
 import { composioToolkitsOptions } from "@multica/core/composio";
@@ -54,6 +55,9 @@ export function IntegrationsTab() {
       </SettingsSection>
       <SettingsSection title={t(($) => $.mattermost.section_title)}>
         <MattermostTab />
+      </SettingsSection>
+      <SettingsSection title={t(($) => $.dingtalk.section_title)}>
+        <DingTalkTab />
       </SettingsSection>
       {vcsAvailable && (
         <SettingsSection title={t(($) => $.vcs.section_title)}>

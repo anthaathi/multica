@@ -1708,6 +1708,54 @@ describe("ApiClient", () => {
   });
 });
 
+// The onboarding flow acts on a workspace the app has not navigated to, so
+// these calls pass the slug explicitly. The server reads X-Workspace-Slug
+// before ?workspace_id, so the header — not the param — is what has to carry
+// the target workspace.
+describe("ApiClient explicit workspace targeting", () => {
+  function stubOk(body: unknown) {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    return fetchMock;
+  }
+
+  function slugHeaderOf(fetchMock: ReturnType<typeof vi.fn>): unknown {
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    return (init.headers as Record<string, string>)["X-Workspace-Slug"];
+  }
+
+  it("sends the given slug on Mika creation", async () => {
+    const fetchMock = stubOk({ id: "agent-1" });
+    await new ApiClient("https://api.example.test").createMikaAgent(
+      { runtime_id: "runtime-1", language: "en" },
+      "proxima-centauri",
+    );
+    expect(slugHeaderOf(fetchMock)).toBe("proxima-centauri");
+  });
+
+  it("sends the given slug when listing another workspace's runtimes", async () => {
+    const fetchMock = stubOk([]);
+    await new ApiClient("https://api.example.test").listRuntimes(
+      { workspace_id: "ws-2", owner: "me" },
+      "proxima-centauri",
+    );
+    expect(slugHeaderOf(fetchMock)).toBe("proxima-centauri");
+  });
+
+  it("omits the header when no slug is given, leaving the ambient one", async () => {
+    const fetchMock = stubOk([]);
+    await new ApiClient("https://api.example.test").listRuntimes({
+      workspace_id: "ws-2",
+    });
+    expect(slugHeaderOf(fetchMock)).toBeUndefined();
+  });
+});
+
 describe("ApiClient model discovery response schema", () => {
   const completed = {
     id: "req-1",

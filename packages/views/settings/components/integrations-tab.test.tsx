@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
 import { ApiError } from "@multica/core/api";
 import { configStore } from "@multica/core/config";
 import { COMPOSIO_MCP_APPS_FLAG } from "@multica/core/feature-flags";
@@ -47,11 +47,16 @@ vi.mock("./slack-tab", () => ({
 vi.mock("./mattermost-tab", () => ({
   MattermostTab: () => <div data-testid="mattermost-tab" />,
 }));
+vi.mock("./dingtalk-tab", () => ({
+  DingTalkTab: () => <div data-testid="dingtalk-tab" />,
+}));
 vi.mock("./vcs-tab", () => ({
   VCSTab: () => <div data-testid="vcs-tab" />,
 }));
 
 import { IntegrationsTab } from "./integrations-tab";
+
+afterEach(cleanup);
 
 function renderTab() {
   return render(
@@ -95,18 +100,23 @@ describe("Settings IntegrationsTab", () => {
 
     expect(screen.queryByTestId("composio-tab")).toBeNull();
   });
-  it("renders a section for every channel integration, including Mattermost", () => {
+  it("renders a section for every channel integration, including Mattermost and DingTalk", () => {
     renderTab();
 
     expect(screen.getByTestId("lark-tab")).toBeInTheDocument();
     expect(screen.getByTestId("composio-tab")).toBeInTheDocument();
     expect(screen.getByTestId("slack-tab")).toBeInTheDocument();
-    // Mattermost slots in as its own section alongside the others.
+    // Mattermost (fork) and DingTalk (upstream) each slot in as their own section.
     expect(screen.getByTestId("mattermost-tab")).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { name: /^Mattermost$/i }),
     ).toBeInTheDocument();
+    expect(screen.getByTestId("dingtalk-tab")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: /^DingTalk$/i }),
+    ).toBeInTheDocument();
   });
+
 
 
   it("hides the Git providers section when the deployment reports it unavailable", () => {

@@ -28,6 +28,7 @@ import (
 	"github.com/multica-ai/multica/server/internal/integrations/channel/engine"
 	composiointeg "github.com/multica-ai/multica/server/internal/integrations/composio"
 	"github.com/multica-ai/multica/server/internal/integrations/issuesync"
+	"github.com/multica-ai/multica/server/internal/integrations/dingtalk"
 	"github.com/multica-ai/multica/server/internal/integrations/lark"
 	"github.com/multica-ai/multica/server/internal/integrations/mattermost"
 	"github.com/multica-ai/multica/server/internal/integrations/slack"
@@ -709,6 +710,54 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 		h.IssueSync.Providers[issuesync.ProviderJira] = issuesync.NewJiraProvider(queries, h.JiraBox)
 	}
 
+	// DingTalk uses one outbound Stream connection per BYO installation. The
+	// AppSecret is encrypted at rest and the integration is inert unless its
+	// dedicated deployment key is configured.
+	if dingtalkKey, err := secretbox.LoadKey("MULTICA_DINGTALK_SECRET_KEY"); err == nil {
+		box, err := secretbox.New(dingtalkKey)
+		if err != nil {
+			slog.Error("dingtalk: secretbox.New failed; integration disabled", "error", err)
+		} else {
+			dingtalkClient := dingtalk.NewClient(nil, "")
+			bindingSvc := dingtalk.NewBindingTokenService(queries, pool)
+			h.DingTalkBindingTokens = bindingSvc
+			replier := dingtalk.NewOutboundReplier(dingtalk.OutboundReplierConfig{
+				Binding: bindingSvc,
+				Decrypt: box.Open,
+				Client:  dingtalkClient,
+				AppURL:  appURLFromEnv(),
+				Logger:  slog.Default(),
+			})
+			ack := dingtalk.NewAckNotifier(dingtalkClient, box.Open, slog.Default())
+			var media engine.MediaResolver
+			if store != nil {
+				media = dingtalk.NewMediaResolver(
+					dingtalkClient,
+					box.Open,
+					store,
+					engine.NewDBMediaIntentLedger(queries),
+					slog.Default(),
+				)
+			}
+			channelRouter.Register(dingtalk.TypeDingTalk, dingtalk.NewDingTalkResolverSet(queries, pool, replier, ack, media))
+			dingtalk.NewOutbound(queries, box.Open, dingtalkClient, slog.Default()).Register(bus)
+			dingtalk.RegisterDingTalk(channelRegistry, dingtalk.ChannelDeps{
+				Decrypt: box.Open,
+				Client:  dingtalkClient,
+				Logger:  slog.Default(),
+			})
+			installSvc, installErr := dingtalk.NewInstallService(queries, pool, box, slog.Default())
+			if installErr != nil {
+				slog.Error("dingtalk: InstallService init failed; install disabled", "error", installErr)
+			} else {
+				h.DingTalkInstall = installSvc
+			}
+			slog.Info("dingtalk integration enabled (BYO per-installation stream mode)")
+		}
+	} else {
+		slog.Info("dingtalk integration disabled (MULTICA_DINGTALK_SECRET_KEY not set)")
+	}
+
 	// Composio integration (MUL-3720). Gated by COMPOSIO_API_KEY plus the
 	// composio_mcp_apps feature flag. The env var is the project-scoped key the
 	// standalone SDK authenticates Composio with (sent as x-api-key; the project
@@ -1196,6 +1245,15 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					r.Delete("/mattermost/installations/{installationId}", h.RevokeMattermostInstallation)
 					r.Post("/mattermost/install/byo", h.RegisterMattermostBYO)
 				})
+				r.Group(func(r chi.Router) {
+					r.Use(middleware.RequireWorkspaceMemberFromURL(queries, "id"))
+					r.Get("/dingtalk/installations", h.ListDingTalkInstallations)
+				})
+				r.Group(func(r chi.Router) {
+					r.Use(middleware.RequireWorkspaceRoleFromURL(queries, "id", "owner", "admin"))
+					r.Delete("/dingtalk/installations/{installationId}", h.RevokeDingTalkInstallation)
+					r.Post("/dingtalk/install/byo", h.RegisterDingTalkBYO)
+				})
 			})
 		})
 
@@ -1217,6 +1275,9 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 		// any workspace context — the redemption itself mints their binding
 		// row.
 		r.Post("/api/mattermost/binding/redeem", h.RedeemMattermostBindingToken)
+		// DingTalk binding redemption is user-scoped for the same reason as
+		// Slack: the token is redeemed before workspace context is selected.
+		r.Post("/api/dingtalk/binding/redeem", h.RedeemDingTalkBindingToken)
 
 		// Composio integration (MUL-3720). User-scoped (no workspace context):
 		// a connection belongs to a user. These four require a logged-in
@@ -1482,6 +1543,11 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 				// workspace (find-or-create by name) and creates the agent
 				// with the template's instructions in one transaction.
 				r.Post("/from-template", h.CreateAgentFromTemplate)
+				// The workspace's built-in Chief of Staff. Server-owned: the
+				// caller supplies only a runtime and a language, so a client
+				// cannot mint an agent carrying `system_key` and thereby claim
+				// the system instruction layer. Idempotent per workspace.
+				r.Post("/mika", h.CreateMikaAgent)
 				r.Route("/{id}", func(r chi.Router) {
 					r.Get("/", h.GetAgent)
 					r.Put("/", h.UpdateAgent)
@@ -1636,6 +1702,7 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					r.Patch("/archive", h.SetChatSessionArchived)
 					r.Delete("/", h.DeleteChatSession)
 					r.Post("/messages", h.SendChatMessage)
+					r.Post("/onboarding", h.StartMikaOnboarding)
 					// Explicit "refresh" of a turn's quick actions: re-runs the
 					// daemon suggestion pass for the latest assistant reply (MUL-5149).
 					r.Post("/quick-actions/regenerate", h.RegenerateChatQuickActions)

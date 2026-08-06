@@ -113,25 +113,82 @@
       "navigation": "ナビゲーション"
     },
     "actions": {
-      "openSearch": { "label": "検索を開く", "description": "どこからでも検索やコマンドを実行します。" },
-      "createIssue": { "label": "タスクを作成", "description": "優先するタスク作成フローを開きます。" },
-      "toggleSidebar": { "label": "サイドバーを切り替え", "description": "メインサイドバーの表示を切り替えます。" },
-      "toggleChat": { "label": "チャットウィンドウを切り替え", "description": "フローティングチャットを開閉します。開いたときは入力欄にフォーカスします。" },
-      "findInIssue": { "label": "タスク内を検索", "description": "開いているタスクの詳細を検索します。" },
-      "openThreadNav": { "label": "スレッドナビゲーターを開く", "description": "開いているタスクのコメントスレッドを一覧・検索して移動します。" },
-      "send": { "label": "送信", "description": "チャット、コメント、返信、フィードバック、プロンプトを送信し、作成ダイアログでタスクを作成します。" },
-      "goInbox": { "label": "受信トレイへ移動", "description": "ワークスペースの受信トレイを開きます。" },
-      "goChat": { "label": "チャットへ移動", "description": "ワークスペースのチャットを開きます。" },
-      "goMyIssues": { "label": "自分のタスクへ移動", "description": "自分に割り当てられたタスクを開きます。" },
-      "goIssues": { "label": "タスクへ移動", "description": "タスク一覧を開きます。" },
-      "goProjects": { "label": "プロジェクトへ移動", "description": "プロジェクト一覧を開きます。" },
-      "goAutopilots": { "label": "自動化へ移動", "description": "ワークスペースの自動化を開きます。" },
-      "goAgents": { "label": "エージェントへ移動", "description": "エージェント一覧を開きます。" },
-      "goSquads": { "label": "Squadsへ移動", "description": "Squad一覧を開きます。" },
-      "goUsage": { "label": "使用量へ移動", "description": "使用量分析を開きます。" },
-      "goRuntimes": { "label": "ランタイムへ移動", "description": "ランタイム設定を開きます。" },
-      "goSkills": { "label": "Skillsへ移動", "description": "Skillライブラリを開きます。" },
-      "goSettings": { "label": "設定へ移動", "description": "ワークスペース設定を開きます。" }
+      "openSearch": {
+        "label": "検索を開く",
+        "description": "どこからでも検索やコマンドを実行します。"
+      },
+      "createIssue": {
+        "label": "タスクを作成",
+        "description": "優先するタスク作成フローを開きます。"
+      },
+      "toggleSidebar": {
+        "label": "サイドバーを切り替え",
+        "description": "メインサイドバーの表示を切り替えます。"
+      },
+      "toggleChat": {
+        "label": "チャットウィンドウを切り替え",
+        "description": "フローティングチャットを開閉します。開いたときは入力欄にフォーカスします。"
+      },
+      "findInIssue": {
+        "label": "タスク内を検索",
+        "description": "開いているタスクの詳細を検索します。"
+      },
+      "openThreadNav": {
+        "label": "スレッドナビゲーターを開く",
+        "description": "開いているタスクのコメントスレッドを一覧・検索して移動します。"
+      },
+      "send": {
+        "label": "送信",
+        "description": "チャット、コメント、返信、フィードバック、プロンプトを送信し、作成ダイアログでタスクを作成します。"
+      },
+      "goInbox": {
+        "label": "受信トレイへ移動",
+        "description": "ワークスペースの受信トレイを開きます。"
+      },
+      "goChat": {
+        "label": "チャットへ移動",
+        "description": "ワークスペースのチャットを開きます。"
+      },
+      "goMyIssues": {
+        "label": "自分のタスクへ移動",
+        "description": "自分に割り当てられたタスクを開きます。"
+      },
+      "goIssues": {
+        "label": "タスクへ移動",
+        "description": "タスク一覧を開きます。"
+      },
+      "goProjects": {
+        "label": "プロジェクトへ移動",
+        "description": "プロジェクト一覧を開きます。"
+      },
+      "goAutopilots": {
+        "label": "自動化へ移動",
+        "description": "ワークスペースの自動化を開きます。"
+      },
+      "goAgents": {
+        "label": "エージェントへ移動",
+        "description": "エージェント一覧を開きます。"
+      },
+      "goSquads": {
+        "label": "Squadsへ移動",
+        "description": "Squad一覧を開きます。"
+      },
+      "goUsage": {
+        "label": "使用量へ移動",
+        "description": "使用量分析を開きます。"
+      },
+      "goRuntimes": {
+        "label": "ランタイムへ移動",
+        "description": "ランタイム設定を開きます。"
+      },
+      "goSkills": {
+        "label": "Skillsへ移動",
+        "description": "Skillライブラリを開きます。"
+      },
+      "goSettings": {
+        "label": "設定へ移動",
+        "description": "ワークスペース設定を開きます。"
+      }
     },
     "fixed": {
       "title": "固定のシステムショートカット",
@@ -330,8 +387,8 @@
         "description": "フォロー中のタスクのステータスが変わったとき（例: todo、in progress、done）"
       },
       "comments": {
-        "label": "コメントとメンション",
-        "description": "フォロー中のタスクに新しいコメントが付いたとき、または誰かがあなたを @メンションしたとき"
+        "label": "コメント",
+        "description": "フォロー中のタスクに新しいコメントが付いたとき"
       },
       "updates": {
         "label": "優先度と期限",
@@ -340,6 +397,10 @@
       "agent_activity": {
         "label": "エージェントのアクティビティ",
         "description": "エージェントの作業が完了または失敗したとき"
+      },
+      "mentions": {
+        "label": "メンション",
+        "description": "誰かがあなたを @メンションしたとき（@all と @squad を含む）"
       }
     },
     "system": {
@@ -893,5 +954,41 @@
     "toast_open_failed": "Jira の接続画面を開けませんでした",
     "toast_disconnect_failed": "Jira の切断に失敗しました",
     "toast_disconnected": "Jira を切断しました"
+  },
+  "dingtalk": {
+    "section_title": "DingTalk",
+    "page_description": "各 Multica エージェントを専用の DingTalk ロボットに接続します。メンバーはボットに DM したり、グループで @メンションしたり、/issue と入力して新しい Multica イシューを起こすことができます。",
+    "not_enabled_title": "DingTalk 連携が有効になっていません",
+    "not_enabled_description_prefix": "サーバーで",
+    "not_enabled_description_suffix": "を設定すると DingTalk ロボットのインストールが有効になります。",
+    "not_enabled_self_host_hint": "セルフホストの場合: 詳細はプロジェクトの README を参照してください。",
+    "connected_bots": "接続済みのボット",
+    "loading": "読み込み中…",
+    "empty_title": "まだボットが接続されていません",
+    "empty_description_prefix": "このワークスペースのエージェントを開き、",
+    "empty_description_cta": "DingTalk を接続",
+    "empty_description_suffix": "をクリックしてロボットをインストールします。",
+    "revoked_badge": "取り消し済み",
+    "installed_at_label": "{{when}} にインストール",
+    "disconnect": "切断",
+    "disconnecting": "切断中…",
+    "disconnect_confirm_title": "この DingTalk ボットを切断しますか？",
+    "disconnect_confirm_description": "このボットはこのワークスペースの DingTalk メッセージを受信しなくなります。インストール記録は監査のため保持され、あとでボットを再接続できます。",
+    "disconnect_confirm_cancel": "キャンセル",
+    "toast_disconnected": "DingTalk ボットを切断しました",
+    "toast_disconnect_failed": "切断に失敗しました",
+    "bind_button": "DingTalk を接続",
+    "bind_button_title": "{{agent}} を DingTalk ボットに接続",
+    "agent_bot_connected_label": "DingTalk に接続済み",
+    "agent_bot_disconnect_tooltip": "この DingTalk ボットをエージェントから解除します。ボットは DingTalk メッセージを受信しなくなります。",
+    "byo_dialog_title": "DingTalk ボットを接続",
+    "byo_docs_link": "Step-by-step：Multica エージェントを DingTalk に接続する",
+    "byo_appkey_label": "AppKey（client id）",
+    "byo_appsecret_label": "AppSecret（client secret）",
+    "byo_submit": "接続",
+    "byo_submitting": "接続中…",
+    "byo_cancel": "キャンセル",
+    "byo_success_toast": "DingTalk ボットを接続しました",
+    "byo_failed_toast": "DingTalk ボットを接続できませんでした"
   }
 }
