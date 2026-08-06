@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@tanstack/react-query", () => ({
+  queryOptions: (options: unknown) => options,
   useQuery: (options: { queryKey?: readonly unknown[] }) => {
     switch (options.queryKey?.[0]) {
       case "project-detail":
@@ -32,6 +33,23 @@ vi.mock("@tanstack/react-query", () => ({
         return { data: undefined, isLoading: false };
     }
   },
+  useMutation: () => ({
+    mutate: () => {},
+    mutateAsync: () => Promise.resolve(),
+    isPending: false,
+    isIdle: false,
+    isSuccess: false,
+    isError: false,
+    reset: () => {},
+  }),
+  useQueryClient: () => ({
+    invalidateQueries: () => {},
+    refetchQueries: () => {},
+    setQueryData: () => {},
+    removeQueries: () => {},
+    getQueryData: () => undefined,
+    clear: () => {},
+  }),
 }));
 
 vi.mock("@multica/core/projects/queries", () => ({
