@@ -36,7 +36,7 @@ func BuildNewCommentsHint(issueID, triggerCommentID, triggerThreadID, newComment
 		return fmt.Sprintf(
 			"%d new comment(s) on this issue since your last run — don't read them all blindly. "+
 				"Start with the thread your triggering comment is in: "+
-				"`multica issue comment list %s --thread %s --since %s --output json` "+
+				"`multica issue comment list %s --thread %s --since %s --compact --output json` "+
 				"(swap `--since` for `--tail 30` if you need the full thread, not just the delta). "+
 				"Only if you need context from the other threads, rerun it without `--thread` for the issue-wide catch-up.\n\n",
 			newCommentCount, issueID, threadID, newCommentsSince,
@@ -47,7 +47,7 @@ func BuildNewCommentsHint(issueID, triggerCommentID, triggerThreadID, newComment
 	// issue-wide catch-up.
 	return fmt.Sprintf(
 		"%d new comment(s) on this issue since your last run. Catch up: "+
-			"`multica issue comment list %s --since %s --output json`.\n\n",
+			"`multica issue comment list %s --since %s --compact --output json`.\n\n",
 		newCommentCount, issueID, newCommentsSince,
 	)
 }
@@ -73,7 +73,7 @@ func BuildResumedCommentsHint(issueID, triggerCommentID, triggerThreadID string)
 			"No other new comments on this issue since your last run. "+
 			"If your reply depends on thread context, do not rely only on resumed session memory — "+
 			"first pull the triggering conversation with: "+
-			"`multica issue comment list %s --thread %s --tail 30 --output json`.\n\n",
+			"`multica issue comment list %s --thread %s --tail 30 --compact --output json`.\n\n",
 		issueID, threadID,
 	)
 }
@@ -103,7 +103,7 @@ func BuildColdCommentsHint(issueID, triggerCommentID, triggerThreadID string) st
 	// routing value (MUL-5721 OPT-1).
 	return fmt.Sprintf(
 		"Read the triggering conversation first: "+
-			"`multica issue comment list %s --thread %s --tail 30 --output json` "+
+			"`multica issue comment list %s --thread %s --tail 30 --compact --output json` "+
 			"(that thread's root + its 30 newest replies). "+
 			"Need cross-thread background? Rerun with `--roots-only --summary` replacing `--thread ... --tail 30` "+
 			"to scan the other threads cheaply, and expand only what looks relevant.\n\n",

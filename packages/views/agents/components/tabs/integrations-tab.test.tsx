@@ -75,6 +75,13 @@ vi.mock("@multica/core/dingtalk", () => ({
   }),
 }));
 
+vi.mock("@multica/core/wecom", () => ({
+  wecomInstallationsOptions: () => ({
+    queryKey: ["wecom", "installations"],
+    queryFn: vi.fn(),
+  }),
+}));
+
 vi.mock("@multica/core/auth", () => {
   const useAuthStore = Object.assign(
     (sel?: (s: { user: { id: string } }) => unknown) =>
@@ -123,6 +130,14 @@ vi.mock("../../../settings/components/mattermost-tab", () => ({
 vi.mock("../../../settings/components/dingtalk-tab", () => ({
   DingTalkAgentBindButton: ({ agentId }: { agentId: string }) => (
     <div data-testid="dingtalk-bind-button" data-agent-id={agentId} />
+  ),
+}));
+
+// Same stubbing rationale for WeCom smart-bot: the shared bind entry has
+// its own coverage in wecom-tab.test.tsx (when added); here it's a marker.
+vi.mock("../../../settings/components/wecom-tab", () => ({
+  WecomAgentBindButton: ({ agentId }: { agentId: string }) => (
+    <div data-testid="wecom-bind-button" data-agent-id={agentId} />
   ),
 }));
 
@@ -216,16 +231,17 @@ describe("IntegrationsTab", () => {
     membersRef.current = [{ user_id: "user-1", role: "member" }];
     renderTab(<IntegrationsTab agent={{ ...agent, owner_id: "user-2" }} />);
     expect(
-      screen.getByText(/Only workspace owners and admins can connect an agent/i),
-    ).toBeTruthy();
+      screen.getAllByText(/Only workspace owners and admins can connect an agent/i).length,
+    ).toBeGreaterThanOrEqual(1);
     expect(screen.queryByTestId("lark-bind-button")).toBeNull();
     expect(screen.queryByTestId("slack-bind-button")).toBeNull();
+    expect(screen.queryByTestId("wecom-bind-button")).toBeNull();
   });
 
   it("lets a non-admin agent owner bind Lark but keeps Slack admin-only", () => {
     // The agent's owner (user-1) is only a plain workspace member. Lark
     // authorizes the agent owner (canManageAgent), so the Lark bind entry
-    // renders and receives owner_id; Slack's and DingTalk's routes stay
+    // renders and receives owner_id; Slack, DingTalk and WeCom routes stay
     // admin-only, so each shows the read-only note instead of a CTA (MUL-4213).
     membersRef.current = [{ user_id: "user-1", role: "member" }];
     renderTab(<IntegrationsTab agent={agent} />);
@@ -233,12 +249,14 @@ describe("IntegrationsTab", () => {
     expect(larkButton.getAttribute("data-agent-id")).toBe("agent-1");
     expect(larkButton.getAttribute("data-agent-owner-id")).toBe("user-1");
     expect(screen.queryByTestId("slack-bind-button")).toBeNull();
-    // All three admin-only platforms (Slack + Mattermost + DingTalk) fall back
-    // to the shared members note instead of a bind CTA — one note per section.
+    expect(screen.queryByTestId("wecom-bind-button")).toBeNull();
+    // All four admin-only platforms (Slack + Mattermost + DingTalk + WeCom)
+    // fall back to the shared members note instead of a bind CTA — one note
+    // per section.
     const adminOnlyNotes = screen.getAllByText(
       /Only workspace owners and admins can connect an agent/i,
     );
-    expect(adminOnlyNotes).toHaveLength(3);
+    expect(adminOnlyNotes).toHaveLength(4);
     expect(screen.queryByTestId("mattermost-bind-button")).toBeNull();
     expect(screen.queryByTestId("dingtalk-bind-button")).toBeNull();
   });

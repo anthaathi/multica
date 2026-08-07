@@ -240,7 +240,7 @@ func TestPerRunCommentContextStaysOutOfBrief(t *testing.T) {
 	for _, want := range []string{
 		"4 new comment(s) on this issue since your last run",
 		"blindly",
-		"--thread thread-abc --since " + since + " --output json",
+		"--thread thread-abc --since " + since + " --compact --output json",
 		"--tail 30",
 	} {
 		if !strings.Contains(hint, want) {
@@ -258,7 +258,7 @@ func TestColdCommentsHintPointsAtTriggeringThread(t *testing.T) {
 	if strings.Contains(hint, "new comment(s) since your last run") {
 		t.Errorf("no since-delta hint should render on cold start, got:\n%s", hint)
 	}
-	if !strings.Contains(hint, "multica issue comment list "+issueID+" --thread thread-root-1 --tail 30 --output json") {
+	if !strings.Contains(hint, "multica issue comment list "+issueID+" --thread thread-root-1 --tail 30 --compact --output json") {
 		t.Errorf("cold start must point at the triggering thread read, got:\n%s", hint)
 	}
 	if strings.Contains(buildMetaSkillContent("claude", TaskContextForEnv{IssueID: issueID, TriggerCommentID: "trigger-1", TriggerThreadID: "thread-root-1"}), "thread-root-1") {
@@ -277,7 +277,7 @@ func TestResumedCommentsHintSkipsDefaultThreadRead(t *testing.T) {
 		"No other new comments on this issue since your last run",
 		"If your reply depends on thread context",
 		"do not rely only on resumed session memory",
-		"multica issue comment list " + issueID + " --thread thread-root-1 --tail 30 --output json",
+		"multica issue comment list " + issueID + " --thread thread-root-1 --tail 30 --compact --output json",
 	} {
 		if !strings.Contains(hint, want) {
 			t.Errorf("resumed/no-delta hint missing %q\n--- output ---\n%s", want, hint)
@@ -1612,15 +1612,21 @@ func TestMultiThreadReplyInstructionsFanOut(t *testing.T) {
 	// retired in favour of the `## Comment Formatting` pointer above — it
 	// triple-wrote the mechanism already carried by the brief and the
 	// single-thread cookbook (~1KB per multi-thread turn). These strings are
-	// the retired machinery; none may reappear in the fan-out block:
+	// the retired machinery; none may reappear in the fan-out block. The
+	// `--content-file` / inline `--content` anchors and the semantic
+	// `\n`-escape anchor (replacing the phrasing-fragile "Do NOT write
+	// literal") were added on Elon's #6517 review: without them, prose-only
+	// restatements of the flag mechanics could regrow under green tests.
 	for _, banned := range []string{
 		"For EACH thread above",                // old cookbook opener
 		"UTF-8 file with your file-write tool", // restated mechanism
 		"multica issue comment add",            // embedded example commands
+		"--content-file",                       // restated posting flag (#6517 review)
+		"inline `--content`",                   // restated inline ban (#6517 review)
 		"--content-stdin",                      // restated HEREDOC ban
 		"rm ./reply-",                          // unix cleanup example
 		"Remove-Item",                          // windows cleanup example
-		"Do NOT write literal",                 // restated \n-escape rule
+		"`\\n` escape",                         // restated \n-escape rule, any phrasing
 	} {
 		if strings.Contains(out, banned) {
 			t.Errorf("fan-out block re-grew retired cookbook text %q (mechanism lives in ## Comment Formatting — MUL-5825), got:\n%s", banned, out)

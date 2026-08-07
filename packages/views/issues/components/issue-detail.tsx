@@ -2612,7 +2612,7 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
               key={id}
               value={issue.description || ""}
               placeholder={t(($) => $.detail.desc_placeholder)}
-              onUpdate={(md) => {
+              onUpdate={(md, baseMarkdown) => {
                 // Bind any pending uploads still referenced in the markdown
                 // so they appear in `issueAttachments` after refresh and the
                 // editor's text/code preview keeps working past reload.
@@ -2633,7 +2633,11 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
                 const ids = descPendingAttachmentsRef.current
                   .filter((a) => contentReferencesAttachment(md, a))
                   .map((a) => a.id);
-                handleUpdateField({ description: md, attachment_ids: ids.length > 0 ? ids : undefined });
+                handleUpdateField({
+                  description: md,
+                  description_base: baseMarkdown,
+                  attachment_ids: ids.length > 0 ? ids : undefined,
+                });
               }}
               onUploadFile={handleDescriptionUpload}
               debounceMs={1500}

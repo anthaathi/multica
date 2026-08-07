@@ -124,7 +124,7 @@ func buildPromptBody(task Task, provider string) string {
 		fmt.Fprintf(&b, "> %s\n\n", task.HandoffNote)
 	}
 	fmt.Fprintf(&b, "Start by running `multica issue get %s --output json` to understand your task, then complete it.\n", task.IssueID)
-	fmt.Fprintf(&b, "For comment history, follow the rule in your runtime workflow file (assignment-triggered tasks treat the read as mandatory). Scan the threads first with `multica issue comment list %s --roots-only --summary --output json`, then expand only what matters with `--thread <thread-id> --tail 30`. For `--since` incremental polling, pagination, and folding, see `multica issue comment list --help`.\n", task.IssueID)
+	fmt.Fprintf(&b, "For comment history, follow the rule in your runtime workflow file (assignment-triggered tasks treat the read as mandatory). Scan the threads first with `multica issue comment list %s --roots-only --summary --compact --output json`, then expand only what matters with `--thread <thread-id> --tail 30`. For `--since` incremental polling, pagination, and folding, see `multica issue comment list --help`.\n", task.IssueID)
 	return b.String()
 }
 
@@ -293,7 +293,7 @@ func buildCommentPrompt(task Task, provider string) string {
 				b.WriteString(":\n")
 				fmt.Fprintf(&b, "  > %s\n", strings.ReplaceAll(strings.TrimSpace(cc.Content), "\n", "\n  > "))
 			}
-			fmt.Fprintf(&b, "\nIf you need the surrounding discussion for any of them, fetch its thread with `multica issue comment list %s --thread <thread-id> --tail 30 --output json` using the thread id shown above.\n\n", task.IssueID)
+			fmt.Fprintf(&b, "\nIf you need the surrounding discussion for any of them, fetch its thread with `multica issue comment list %s --thread <thread-id> --tail 30 --compact --output json` using the thread id shown above.\n\n", task.IssueID)
 		} else if len(task.CoalescedCommentIDs) > 0 {
 			// MUL-5442: this fallback used to send the agent at `--recent 30`.
 			// That flag caps THREADS, not comments, and every returned thread
@@ -324,10 +324,10 @@ func buildCommentPrompt(task Task, provider string) string {
 			fmt.Fprintf(&b, "This run also covers %d earlier comment(s) posted before it started — you must read and address every one of them, not just the one above: %s. They may be in DIFFERENT threads, so do not assume they share the triggering thread.\n\n",
 				len(task.CoalescedCommentIDs), strings.Join(task.CoalescedCommentIDs, ", "))
 			if task.NewCommentsSince != "" {
-				fmt.Fprintf(&b, "Start with `multica issue comment list %s --since %s --output json`. Treat that as a candidate window, not a guarantee — it also carries unrelated comments, and a retried run can carry ids older than the window. Check every id above against the result.\n\n",
+				fmt.Fprintf(&b, "Start with `multica issue comment list %s --since %s --compact --output json`. Treat that as a candidate window, not a guarantee — it also carries unrelated comments, and a retried run can carry ids older than the window. Check every id above against the result.\n\n",
 					task.IssueID, task.NewCommentsSince)
 			}
-			fmt.Fprintf(&b, "Fetch each id you still need directly: `multica issue comment list %s --thread <comment-id> --tail 30 --output json`. `--thread` accepts a reply id, not just a thread root, so you do not need to know which thread the comment lives in. If it is older than those 30 replies, page back with the `Next reply cursor` values (`--before` / `--before-id`) until it appears. Do not finish this turn until every id above is accounted for.\n\n",
+			fmt.Fprintf(&b, "Fetch each id you still need directly: `multica issue comment list %s --thread <comment-id> --tail 30 --compact --output json`. `--thread` accepts a reply id, not just a thread root, so you do not need to know which thread the comment lives in. If it is older than those 30 replies, page back with the `Next reply cursor` values (`--before` / `--before-id`) until it appears. Do not finish this turn until every id above is accounted for.\n\n",
 				task.IssueID)
 		}
 		if taskIsSquadLeader(task) {
@@ -348,7 +348,7 @@ func buildCommentPrompt(task Task, provider string) string {
 	} else if cold := execenv.BuildColdCommentsHint(task.IssueID, task.TriggerCommentID, task.TriggerThreadID); cold != "" {
 		b.WriteString(cold)
 	} else {
-		fmt.Fprintf(&b, "Read the discussion: scan with `multica issue comment list %s --roots-only --summary --output json`, then expand what matters with `--thread <thread-id> --tail 30`.\n\n", task.IssueID)
+		fmt.Fprintf(&b, "Read the discussion: scan with `multica issue comment list %s --roots-only --summary --compact --output json`, then expand what matters with `--thread <thread-id> --tail 30`.\n\n", task.IssueID)
 	}
 	// Reply routing. When this run coalesced comments spanning MORE THAN ONE
 	// root thread, answer each thread in its own thread instead of dumping one

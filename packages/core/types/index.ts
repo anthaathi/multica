@@ -111,7 +111,12 @@ export type { IssueSubscriber } from "./subscriber";
 export type * from "./events";
 export type * from "./api";
 export type { Attachment } from "./attachment";
-export { attachmentDownloadPath, attachmentIdFromDownloadURL, contentReferencesAttachment } from "./attachment-url";
+export {
+  attachmentDownloadPath,
+  attachmentIdFromDownloadURL,
+  contentReferencesAttachment,
+  stripChannelMediaMarkers,
+} from "./attachment-url";
 export type {
   ChatSession,
   ChatLastMessage,
@@ -238,6 +243,12 @@ export type {
   RegisterDingTalkBYORequest,
   RedeemDingTalkBindingTokenResponse,
 } from "./dingtalk";
+export type {
+  WecomInstallation,
+  ListWecomInstallationsResponse,
+  RegisterWecomBYORequest,
+  RedeemWecomBindingTokenResponse,
+} from "./wecom";
 export type {
   Autopilot,
   AutopilotStatus,

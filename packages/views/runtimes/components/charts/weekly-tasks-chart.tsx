@@ -58,7 +58,7 @@ export function WeeklyTasksChart({ data }: { data: WeeklyTasksData[] }) {
           axisLine={false}
           tickMargin={8}
           allowDecimals={false}
-          width={40}
+          width="auto"
         />
         <ChartTooltip
           content={

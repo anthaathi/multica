@@ -847,7 +847,7 @@ func TestBuildChatPromptSlashSkills(t *testing.T) {
 func TestBuildPromptDefaultScansRootsFirst(t *testing.T) {
 	out := BuildPrompt(Task{IssueID: "issue-default-1"}, "claude")
 	for _, s := range []string{
-		"multica issue comment list issue-default-1 --roots-only --summary --output json",
+		"multica issue comment list issue-default-1 --roots-only --summary --compact --output json",
 		"--since",
 	} {
 		if !strings.Contains(out, s) {
@@ -934,7 +934,7 @@ func TestBuildPromptNewCommentsHint(t *testing.T) {
 		t.Errorf("hint must discourage blindly reading every new comment, got:\n%s", out)
 	}
 	// Parent thread first: the --thread <trigger> read is the prioritized action.
-	if !strings.Contains(out, "multica issue comment list "+issueID+" --thread thread-root-1 --since "+since+" --output json") {
+	if !strings.Contains(out, "multica issue comment list "+issueID+" --thread thread-root-1 --since "+since+" --compact --output json") {
 		t.Errorf("hint must point at the triggering (parent) thread --since read first, got:\n%s", out)
 	}
 	if !strings.Contains(out, "--tail 30") {
@@ -974,7 +974,7 @@ func TestBuildPromptColdStartThreadRead(t *testing.T) {
 	if strings.Contains(out, "new comment(s) since your last run") {
 		t.Errorf("no since-delta hint should render on cold start, got:\n%s", out)
 	}
-	if !strings.Contains(out, "multica issue comment list "+issueID+" --thread thread-root-1 --tail 30 --output json") {
+	if !strings.Contains(out, "multica issue comment list "+issueID+" --thread thread-root-1 --tail 30 --compact --output json") {
 		t.Errorf("cold start must point at the triggering thread read, got:\n%s", out)
 	}
 	// MUL-5372: cross-thread background is a cheap roots scan. The hint names
@@ -1017,7 +1017,7 @@ func TestBuildPromptResumedNoDeltaDoesNotForceThreadRead(t *testing.T) {
 		"No other new comments on this issue since your last run",
 		"If your reply depends on thread context",
 		"do not rely only on resumed session memory",
-		"multica issue comment list " + issueID + " --thread thread-root-1 --tail 30 --output json",
+		"multica issue comment list " + issueID + " --thread thread-root-1 --tail 30 --compact --output json",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("resumed/no-delta prompt missing %q\n--- output ---\n%s", want, out)
@@ -1109,7 +1109,7 @@ func TestBuildCommentPromptCoalescedIDsOnlyFallback(t *testing.T) {
 		task.NewCommentsSince = "2026-08-03T06:00:00Z"
 		out := BuildPrompt(task, "claude")
 
-		want := "multica issue comment list issue-fallback-1 --since 2026-08-03T06:00:00Z --output json"
+		want := "multica issue comment list issue-fallback-1 --since 2026-08-03T06:00:00Z --compact --output json"
 		if !strings.Contains(out, want) {
 			t.Errorf("id-only fallback should prefetch the window with %q, got:\n%s", want, out)
 		}
@@ -1162,7 +1162,7 @@ func assertBoundedIDOnlyFallback(t *testing.T, out string) {
 	// id is reachable without knowing its thread; paging keeps it reachable even
 	// when it is older than the tail window.
 	for _, want := range []string{
-		"multica issue comment list issue-fallback-1 --thread <comment-id> --tail 30 --output json",
+		"multica issue comment list issue-fallback-1 --thread <comment-id> --tail 30 --compact --output json",
 		"accepts a reply id",
 		"Next reply cursor",
 		"--before-id",

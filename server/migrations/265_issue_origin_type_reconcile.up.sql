@@ -1,6 +1,7 @@
 -- Reconcile issue.origin_type CHECK constraint to the full union of values
 -- across upstream and the fork. Renumbered 157 -> 161 -> 163 -> 164 -> 175
--- -> 191 -> 197 -> 202 -> 203 -> 214 -> 224 -> 253 -> 254 -> 257 -> 263 as upstream claimed prefix 157
+-- -> 191 -> 197 -> 202 -> 203 -> 214 -> 224 -> 253 -> 254 -> 257 -> 263
+-- -> 265 as upstream claimed prefix 157
 -- (157_agent_task_delivered_comments), then 161 (161_agent_skill_enabled), then
 -- 163 (163_agent_builder), then 164 (164_attachment_task_id, PR #5307), then
 -- 175 (175_runtime_profile_add_deveco), then 191 (191_issue_properties,
@@ -10,8 +11,14 @@
 -- (253_runtime_profile_add_qwenpaw, sync 2026-08-04), then 254
 -- (254_runtime_profile_add_reasonix, plus 255_agent_task_queue_chat_pending_deferred_v3
 -- and 256_drop_agent_task_queue_chat_pending_v2, sync 2026-08-06), then 257
--- (257_agent_task_queue_channel_media_pending_unique_v2, sync 2026-08-06); runs
--- last so the union survives regardless of which same-prefix 149 migration ran.
+-- (257_agent_task_queue_channel_media_pending_unique_v2, sync 2026-08-06), then
+-- 263 (263_issue_origin_wecom_chat + 264_issue_origin_wecom_chat_validate,
+-- sync 2026-08-07); runs last so the union survives regardless of which
+-- same-prefix 149 migration ran.
+--
+-- This rebuild must carry every value added by earlier issue_origin_*
+-- migrations, including upstream's new 'wecom_chat' (263) and the fork's
+-- 'issue_sync'/'mattermost_chat' (149), or it would silently drop them.
 --
 -- Two prefix-149 migrations each redefined issue_origin_type_check with a
 -- hardcoded list, and they run in sorted-filename order:
@@ -28,4 +35,4 @@
 -- already-migrated databases.
 ALTER TABLE issue DROP CONSTRAINT IF EXISTS issue_origin_type_check;
 ALTER TABLE issue ADD CONSTRAINT issue_origin_type_check
-    CHECK (origin_type IN ('autopilot', 'quick_create', 'lark_chat', 'slack_chat', 'agent_create', 'dingtalk_chat', 'issue_sync', 'mattermost_chat'));
+    CHECK (origin_type IN ('autopilot', 'quick_create', 'lark_chat', 'slack_chat', 'agent_create', 'dingtalk_chat', 'issue_sync', 'mattermost_chat', 'wecom_chat'));

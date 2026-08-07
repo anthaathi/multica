@@ -11,6 +11,36 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const adoptOrphanOnboardingKickoff = `-- name: AdoptOrphanOnboardingKickoff :exec
+UPDATE chat_message
+SET task_id = $2
+WHERE chat_session_id = $1
+  AND role = 'user'
+  AND message_kind = 'onboarding_kickoff'
+  AND task_id IS NULL
+`
+
+type AdoptOrphanOnboardingKickoffParams struct {
+	ChatSessionID pgtype.UUID `json:"chat_session_id"`
+	TaskID        pgtype.UUID `json:"task_id"`
+}
+
+// Hands the session's unowned kickoff row to the member's first real turn.
+//
+// The kickoff is written with no task_id (nothing runs for the opening any
+// more), so it would never reach a runtime on its own. Adopting it into the
+// first send's input batch is what carries the onboarding skill instruction and
+// the profile block into the run that does the first real work — and, because
+// the kickoff quotes the opening the member already read, what stops Mika from
+// introducing herself a second time.
+//
+// Idempotent by construction: exactly one such row can exist per session, and
+// the task_id IS NULL predicate means later sends adopt nothing.
+func (q *Queries) AdoptOrphanOnboardingKickoff(ctx context.Context, arg AdoptOrphanOnboardingKickoffParams) error {
+	_, err := q.db.Exec(ctx, adoptOrphanOnboardingKickoff, arg.ChatSessionID, arg.TaskID)
+	return err
+}
+
 const advanceCancelledChatSessionPointer = `-- name: AdvanceCancelledChatSessionPointer :exec
 UPDATE chat_session cs
 SET session_id = t.session_id,
@@ -421,6 +451,56 @@ func (q *Queries) CreateChatTask(ctx context.Context, arg CreateChatTaskParams) 
 	return i, err
 }
 
+const createMikaOnboardingOpening = `-- name: CreateMikaOnboardingOpening :one
+INSERT INTO chat_message (chat_session_id, role, content, message_kind, created_at)
+VALUES (
+    $1,
+    'assistant',
+    $2,
+    'onboarding_opening',
+    $3::timestamptz + interval '1 microsecond'
+)
+RETURNING id, chat_session_id, role, content, task_id, created_at, failure_reason, elapsed_ms, message_kind, channel_media_pending_until, channel_ingested, quick_actions
+`
+
+type CreateMikaOnboardingOpeningParams struct {
+	ChatSessionID    pgtype.UUID        `json:"chat_session_id"`
+	Content          string             `json:"content"`
+	KickoffCreatedAt pgtype.Timestamptz `json:"kickoff_created_at"`
+}
+
+// Mika's opening reply, written by the server rather than produced by an agent
+// run (MUL-5827). Paired with the hidden kickoff row in one transaction, which
+// is why created_at is derived instead of defaulted: now() is the TRANSACTION
+// timestamp, so both rows would land on the identical microsecond, and the
+// session-list LATERAL picks the last message with `ORDER BY created_at DESC
+// LIMIT 1` and no tiebreaker (ids are random UUIDs, not monotonic). A tie there
+// can select the kickoff, whose kind makes buildChatLastMessage return nil — so
+// a session that onboarded perfectly reports no last message and the "Start
+// with Mika" recovery card reappears. One microsecond makes the order total.
+//
+// task_id stays NULL: no agent run produced this row, and nothing may treat it
+// as a turn to regenerate or resume.
+func (q *Queries) CreateMikaOnboardingOpening(ctx context.Context, arg CreateMikaOnboardingOpeningParams) (ChatMessage, error) {
+	row := q.db.QueryRow(ctx, createMikaOnboardingOpening, arg.ChatSessionID, arg.Content, arg.KickoffCreatedAt)
+	var i ChatMessage
+	err := row.Scan(
+		&i.ID,
+		&i.ChatSessionID,
+		&i.Role,
+		&i.Content,
+		&i.TaskID,
+		&i.CreatedAt,
+		&i.FailureReason,
+		&i.ElapsedMs,
+		&i.MessageKind,
+		&i.ChannelMediaPendingUntil,
+		&i.ChannelIngested,
+		&i.QuickActions,
+	)
+	return i, err
+}
+
 const deferChatTaskForSealedPendingMedia = `-- name: DeferChatTaskForSealedPendingMedia :one
 UPDATE agent_task_queue AS task
 SET status = 'deferred', fire_at = pending.max_until
@@ -579,10 +659,23 @@ func (q *Queries) DeleteChatSession(ctx context.Context, arg DeleteChatSessionPa
 
 const deleteUserChatMessageByTask = `-- name: DeleteUserChatMessageByTask :one
 DELETE FROM chat_message
-WHERE task_id = $1 AND role = 'user'
+WHERE task_id = $1
+  AND role = 'user'
+  AND message_kind <> 'onboarding_kickoff'
 RETURNING id, chat_session_id, role, content, task_id, created_at, failure_reason, elapsed_ms, message_kind, channel_media_pending_until, channel_ingested, quick_actions
 `
 
+// Deletes the MEMBER-TYPED input of a cancelled/edited turn.
+//
+// The kickoff exclusion is load-bearing since MUL-5827: an onboarding session's
+// first real turn owns two user rows — the member's message and the adopted
+// kickoff — so an unqualified delete would take the kickoff with it. That row
+// is the only copy of the onboarding context and of "you have already greeted
+// them", so losing it makes Mika introduce herself a second time, and the
+// RETURNING row would be an arbitrary one of the two: cancel could hand the
+// member the product's internal prompt as their restored draft, and silently
+// drop what they actually typed. Callers release the kickoff separately
+// (ReleaseOnboardingKickoffFromTask) so the next send re-adopts it.
 func (q *Queries) DeleteUserChatMessageByTask(ctx context.Context, taskID pgtype.UUID) (ChatMessage, error) {
 	row := q.db.QueryRow(ctx, deleteUserChatMessageByTask, taskID)
 	var i ChatMessage
@@ -988,6 +1081,64 @@ func (q *Queries) GetPendingChatTask(ctx context.Context, chatSessionID pgtype.U
 	return i, err
 }
 
+const getPublicChatSessionInWorkspace = `-- name: GetPublicChatSessionInWorkspace :one
+SELECT cs.id, cs.workspace_id, cs.agent_id, cs.creator_id, cs.title, cs.session_id, cs.work_dir, cs.status, cs.created_at, cs.updated_at, cs.unread_since, cs.runtime_id, cs.last_read_at, cs.is_agent_intro, cs.pinned_at, cs.project_id FROM chat_session AS cs
+WHERE cs.id = $1
+  AND cs.workspace_id = $2
+  AND (
+    EXISTS (
+      SELECT 1 FROM chat_message AS public_message
+      WHERE public_message.chat_session_id = cs.id
+        AND public_message.message_kind != 'channel_command'
+    )
+    OR (
+      NOT EXISTS (
+        SELECT 1 FROM channel_chat_session_binding AS binding
+        WHERE binding.chat_session_id = cs.id
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM chat_message AS channel_message
+        WHERE channel_message.chat_session_id = cs.id
+          AND channel_message.channel_ingested
+      )
+    )
+  )
+`
+
+type GetPublicChatSessionInWorkspaceParams struct {
+	ID          pgtype.UUID `json:"id"`
+	WorkspaceID pgtype.UUID `json:"workspace_id"`
+}
+
+// A channel command is a durable control-plane record, not a public chat turn.
+// Channel-created sessions therefore become public only after they contain a
+// non-command message. Empty first-party sessions stay public so the member can
+// open a newly-created Web Chat and send its first message. channel_ingested is
+// the immutable fallback when a channel binding has since been removed.
+func (q *Queries) GetPublicChatSessionInWorkspace(ctx context.Context, arg GetPublicChatSessionInWorkspaceParams) (ChatSession, error) {
+	row := q.db.QueryRow(ctx, getPublicChatSessionInWorkspace, arg.ID, arg.WorkspaceID)
+	var i ChatSession
+	err := row.Scan(
+		&i.ID,
+		&i.WorkspaceID,
+		&i.AgentID,
+		&i.CreatorID,
+		&i.Title,
+		&i.SessionID,
+		&i.WorkDir,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.UnreadSince,
+		&i.RuntimeID,
+		&i.LastReadAt,
+		&i.IsAgentIntro,
+		&i.PinnedAt,
+		&i.ProjectID,
+	)
+	return i, err
+}
+
 const hasActiveChatTaskForSession = `-- name: HasActiveChatTaskForSession :one
 SELECT EXISTS (
   SELECT 1 FROM agent_task_queue
@@ -1117,8 +1268,9 @@ type LinkUnownedChannelChatMessagesToTaskParams struct {
 // Seals the trailing channel-message batch to its task. The task row and these
 // links are committed together, so an older in-flight task cannot absorb a
 // newer media message and a later assistant row cannot hide that message.
-// channel_command turns were already handled synchronously by Router; keeping
-// them visible but unowned prevents both immediate and delayed re-execution.
+// channel_command turns were already handled synchronously by Router. They stay
+// durable for channel orchestration but remain unowned and absent from public
+// Chat projections, preventing both immediate and delayed re-execution.
 func (q *Queries) LinkUnownedChannelChatMessagesToTask(ctx context.Context, arg LinkUnownedChannelChatMessagesToTaskParams) error {
 	_, err := q.db.Exec(ctx, linkUnownedChannelChatMessagesToTask, arg.TaskID, arg.ChatSessionID)
 	return err
@@ -1250,10 +1402,25 @@ LEFT JOIN LATERAL (
   SELECT content, role, created_at, failure_reason, message_kind
     FROM chat_message m
    WHERE m.chat_session_id = cs.id
+     AND m.message_kind != 'channel_command'
    ORDER BY m.created_at DESC
    LIMIT 1
 ) lm ON true
 WHERE cs.workspace_id = $1 AND cs.creator_id = $2
+  AND (
+    lm.created_at IS NOT NULL
+    OR (
+      NOT EXISTS (
+        SELECT 1 FROM channel_chat_session_binding AS binding
+        WHERE binding.chat_session_id = cs.id
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM chat_message AS channel_message
+        WHERE channel_message.chat_session_id = cs.id
+          AND channel_message.channel_ingested
+      )
+    )
+  )
 ORDER BY (cs.pinned_at IS NOT NULL) DESC, cs.pinned_at DESC, COALESCE(lm.created_at, cs.updated_at) DESC
 `
 
@@ -1419,6 +1586,7 @@ func (q *Queries) ListChatInputMessages(ctx context.Context, taskID pgtype.UUID)
 const listChatMessages = `-- name: ListChatMessages :many
 SELECT message.id, message.chat_session_id, message.role, message.content, message.task_id, message.created_at, message.failure_reason, message.elapsed_ms, message.message_kind, message.channel_media_pending_until, message.channel_ingested, message.quick_actions FROM chat_message AS message
 WHERE message.chat_session_id = $1
+  AND message.message_kind != 'channel_command'
   AND NOT (
     message.role = 'user'
     AND EXISTS (
@@ -1565,6 +1733,7 @@ func (q *Queries) ListChatMessagesForLegacyTask(ctx context.Context, chatSession
 const listChatMessagesPage = `-- name: ListChatMessagesPage :many
 SELECT message.id, message.chat_session_id, message.role, message.content, message.task_id, message.created_at, message.failure_reason, message.elapsed_ms, message.message_kind, message.channel_media_pending_until, message.channel_ingested, message.quick_actions FROM chat_message AS message
 WHERE message.chat_session_id = $1
+  AND message.message_kind != 'channel_command'
   AND NOT (
     message.role = 'user'
     AND EXISTS (
@@ -1661,10 +1830,25 @@ LEFT JOIN LATERAL (
   SELECT content, role, created_at, failure_reason, message_kind
     FROM chat_message m
    WHERE m.chat_session_id = cs.id
+     AND m.message_kind != 'channel_command'
    ORDER BY m.created_at DESC
    LIMIT 1
 ) lm ON true
 WHERE cs.workspace_id = $1 AND cs.creator_id = $2 AND cs.status = 'active'
+  AND (
+    lm.created_at IS NOT NULL
+    OR (
+      NOT EXISTS (
+        SELECT 1 FROM channel_chat_session_binding AS binding
+        WHERE binding.chat_session_id = cs.id
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM chat_message AS channel_message
+        WHERE channel_message.chat_session_id = cs.id
+          AND channel_message.channel_ingested
+      )
+    )
+  )
 ORDER BY (cs.pinned_at IS NOT NULL) DESC, cs.pinned_at DESC, COALESCE(lm.created_at, cs.updated_at) DESC
 `
 
@@ -2293,6 +2477,14 @@ WITH latest_visible AS (
     WHERE claimed_input.task_id = $2
       AND claimed_input.role = 'user'
       AND NOT claimed_input.channel_ingested
+      -- The adopted onboarding kickoff is never a visible row, so it has no
+      -- turn boundary to correct — and reanchoring it would actively break the
+      -- one thing its position controls. It is deliberately older than the
+      -- member's message so the runtime reads "context, then their words";
+      -- moving it to dispatch time reverses that, and because the batch's two
+      -- rows would then share one timestamp, their order falls to random UUIDs
+      -- (MUL-5827).
+      AND claimed_input.message_kind <> 'onboarding_kickoff'
 )
 UPDATE chat_message AS claimed_input
 SET created_at = GREATEST(
@@ -2344,6 +2536,10 @@ SET created_at = $2::timestamptz + interval '1 microsecond'
 WHERE queued_input.chat_session_id = $1
   AND queued_input.role = 'user'
   AND NOT queued_input.channel_ingested
+  -- Same exclusion, same reason as ReanchorClaimedDirectChatInput: the hidden
+  -- kickoff has no visible position to fix, and moving it would put the
+  -- product's context after the member's message inside one input batch.
+  AND queued_input.message_kind <> 'onboarding_kickoff'
   AND queued_input.created_at <= $2::timestamptz
   AND EXISTS (
     SELECT 1
@@ -2389,6 +2585,54 @@ type ReanchorNextQueuedDirectChatInputParams struct {
 // direct batching is added, assign stable per-row offsets here.
 func (q *Queries) ReanchorNextQueuedDirectChatInput(ctx context.Context, arg ReanchorNextQueuedDirectChatInputParams) error {
 	_, err := q.db.Exec(ctx, reanchorNextQueuedDirectChatInput, arg.ChatSessionID, arg.AssistantCreatedAt)
+	return err
+}
+
+const releaseOnboardingKickoffFromTask = `-- name: ReleaseOnboardingKickoffFromTask :exec
+UPDATE chat_message
+SET task_id = (
+    SELECT successor.id
+    FROM agent_task_queue AS successor
+    WHERE successor.chat_session_id = chat_message.chat_session_id
+      AND successor.status = 'queued'
+      AND successor.chat_input_task_id = successor.id
+      AND successor.regenerate_quick_actions_for IS NULL
+      AND successor.id <> $1
+    ORDER BY successor.priority DESC, successor.created_at ASC, successor.id ASC
+    LIMIT 1
+)
+WHERE task_id = $1
+  AND role = 'user'
+  AND message_kind = 'onboarding_kickoff'
+`
+
+// Hands an adopted kickoff on to the session's next un-started turn when its
+// own turn dies (terminal failure, cancel, edit), falling back to unowned when
+// there is no such turn.
+//
+// Handing off rather than simply clearing to NULL is what closes the queued
+// successor case. Adoption happens inside a send's transaction, so a message
+// queued WHILE the kickoff's turn was still running found nothing to adopt and
+// never gets another chance: clearing to NULL would leave that already-sealed
+// turn to execute with no onboarding skill, no profile block, and no record
+// that Mika had already greeted the member — exactly the double-introduction
+// this design exists to prevent — while a later message could pick the kickoff
+// up instead, delivering the context to the wrong turn.
+//
+// Target restrictions, each load-bearing:
+//   - status = 'queued' only. A dispatched/running turn has already had its
+//     prompt built from its input batch, so joining it now would consume the
+//     kickoff without ever delivering it.
+//   - chat_input_task_id = id selects roots that own their own input batch. A
+//     retry child names its root instead, and the kickoff is already reachable
+//     through that root, so a retry must not be re-targeted.
+//   - regenerate_quick_actions_for IS NULL skips background suggestion passes,
+//     which carry no user input and are invisible in the transcript.
+//
+// Ordering matches the shared visible-head selector above ListChatMessages, so
+// the kickoff lands on whichever turn the member will actually see run next.
+func (q *Queries) ReleaseOnboardingKickoffFromTask(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, releaseOnboardingKickoffFromTask, id)
 	return err
 }
 
@@ -2609,28 +2853,46 @@ func (q *Queries) TaskHasChannelIngestedMessages(ctx context.Context, taskID pgt
 	return channel_ingested, err
 }
 
-const taskHasOnboardingKickoffInput = `-- name: TaskHasOnboardingKickoffInput :one
-SELECT EXISTS (
-    SELECT 1 FROM chat_message
-    WHERE task_id = $1
-      AND role = 'user'
-      AND message_kind = 'onboarding_kickoff'
-)
+const taskInputIsOnboardingKickoffOnly = `-- name: TaskInputIsOnboardingKickoffOnly :one
+SELECT
+    EXISTS (
+        SELECT 1 FROM chat_message AS kickoff
+        WHERE kickoff.task_id = $1
+          AND kickoff.role = 'user'
+          AND kickoff.message_kind = 'onboarding_kickoff'
+    )
+    AND NOT EXISTS (
+        SELECT 1 FROM chat_message AS typed
+        WHERE typed.task_id = $1
+          AND typed.role = 'user'
+          AND typed.message_kind <> 'onboarding_kickoff'
+    ) AS kickoff_only
 `
 
-// Whether this input batch is the product-authored onboarding kickoff. The
-// opening it produces renders the starter cards instead of suggestion chips
-// (MUL-5765), so the quick-actions pass skips that turn.
+// Whether this input batch is a kickoff and NOTHING else — the shape only a
+// pre-MUL-5827 opening task has, where the kickoff was a turn of its own.
+//
+// Reachable exclusively during a rolling deploy: a kickoff task enqueued by the
+// old server and claimed by the new one. The reply to it is still that member's
+// opening, so it still has to be stamped, or their session permanently renders
+// without the starter cards (the kind is persisted; nothing recomputes it).
+//
+// The "and nothing else" half is what makes this safe to keep: an input batch
+// that pairs the kickoff with a real member message is the NEW shape, and
+// stamping that turn would render the starter cards a second time under a reply
+// that is not an opening.
+//
+// Delete this once no pre-deploy kickoff tasks can still be in flight; nothing
+// creates this shape any more.
 //
 // $1 is the INPUT-OWNING task id — COALESCE(task.chat_input_task_id, task.id),
-// i.e. chatInputOwnerID — never a retry clone's own id. The whole retry chain
-// consumes the root's input batch (MUL-4351), so only the root owns the
-// kickoff user row; passing a child's id here silently answers false.
-func (q *Queries) TaskHasOnboardingKickoffInput(ctx context.Context, taskID pgtype.UUID) (bool, error) {
-	row := q.db.QueryRow(ctx, taskHasOnboardingKickoffInput, taskID)
-	var exists bool
-	err := row.Scan(&exists)
-	return exists, err
+// i.e. chatInputOwnerID — never a retry clone's own id, since the whole retry
+// chain consumes the root's input batch (MUL-4351).
+func (q *Queries) TaskInputIsOnboardingKickoffOnly(ctx context.Context, taskID pgtype.UUID) (pgtype.Bool, error) {
+	row := q.db.QueryRow(ctx, taskInputIsOnboardingKickoffOnly, taskID)
+	var kickoff_only pgtype.Bool
+	err := row.Scan(&kickoff_only)
+	return kickoff_only, err
 }
 
 const touchChatSession = `-- name: TouchChatSession :exec
@@ -2641,6 +2903,33 @@ WHERE id = $1
 func (q *Queries) TouchChatSession(ctx context.Context, id pgtype.UUID) error {
 	_, err := q.db.Exec(ctx, touchChatSession, id)
 	return err
+}
+
+const updateChatMessageContentForChannelMedia = `-- name: UpdateChatMessageContentForChannelMedia :execrows
+UPDATE chat_message
+SET content = $1
+WHERE id = $2
+  AND chat_session_id = $3
+  AND role = 'user'
+  AND channel_ingested
+`
+
+type UpdateChatMessageContentForChannelMediaParams struct {
+	Content       string      `json:"content"`
+	ID            pgtype.UUID `json:"id"`
+	ChatSessionID pgtype.UUID `json:"chat_session_id"`
+}
+
+// Channel messages are immutable user turns. Media resolution may finish after
+// the initial append, so materialize stable inline attachment references in the
+// same transaction that binds those attachments. The provenance and role guards
+// prevent this narrow post-append path from rewriting ordinary web/agent rows.
+func (q *Queries) UpdateChatMessageContentForChannelMedia(ctx context.Context, arg UpdateChatMessageContentForChannelMediaParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateChatMessageContentForChannelMedia, arg.Content, arg.ID, arg.ChatSessionID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const updateChatSessionProject = `-- name: UpdateChatSessionProject :one

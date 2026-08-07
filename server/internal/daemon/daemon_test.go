@@ -300,9 +300,10 @@ func TestRepoCheckoutModeFor(t *testing.T) {
 		name, provider, goos, want string
 	}{
 		{name: "Linux Codex isolates Git metadata", provider: "codex", goos: "linux", want: repoCheckoutModeIsolated},
+		{name: "Windows Codex isolates Git metadata", provider: "codex", goos: "windows", want: repoCheckoutModeIsolated},
 		{name: "macOS Codex keeps worktree", provider: "codex", goos: "darwin"},
-		{name: "Windows Codex keeps worktree", provider: "codex", goos: "windows"},
 		{name: "Linux Claude keeps worktree", provider: "claude", goos: "linux"},
+		{name: "Windows Claude keeps worktree", provider: "claude", goos: "windows"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -2800,6 +2801,63 @@ func (blockingBackend) Execute(_ context.Context, _ string, _ agent.ExecOptions)
 	resCh := make(chan agent.Result)
 	close(msgCh)
 	return &agent.Session{Messages: msgCh, Result: resCh}, nil
+}
+
+type countedRunningBackend struct {
+	release <-chan struct{}
+}
+
+func (b countedRunningBackend) Execute(_ context.Context, _ string, _ agent.ExecOptions) (*agent.Session, error) {
+	msgCh := make(chan agent.Message)
+	resCh := make(chan agent.Result, 1)
+	go func() {
+		<-b.release
+		close(msgCh)
+		resCh <- agent.Result{Status: "completed"}
+	}()
+	return &agent.Session{Messages: msgCh, Result: resCh}, nil
+}
+
+func TestExecuteAndDrainTracksRunningTaskCount(t *testing.T) {
+	t.Parallel()
+
+	d := newTestDaemon(t)
+	release := make(chan struct{})
+	done := make(chan error, 1)
+	go func() {
+		_, _, err := d.executeAndDrain(
+			context.Background(),
+			countedRunningBackend{release: release},
+			"p",
+			agent.ExecOptions{},
+			slog.Default(),
+			"task-counted-running",
+			"",
+			new(atomic.Int32),
+		)
+		done <- err
+	}()
+
+	deadline := time.Now().Add(time.Second)
+	for d.runningTasks.Load() != 1 && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
+	}
+	if got := d.runningTasks.Load(); got != 1 {
+		t.Fatalf("running task count while backend is live = %d, want 1", got)
+	}
+
+	close(release)
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("executeAndDrain: %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("executeAndDrain did not return after backend release")
+	}
+	if got := d.runningTasks.Load(); got != 0 {
+		t.Fatalf("running task count after backend exit = %d, want 0", got)
+	}
 }
 
 func TestExecuteAndDrain_ContextCancelled_ReportsCancelled(t *testing.T) {
