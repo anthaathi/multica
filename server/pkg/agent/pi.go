@@ -507,10 +507,11 @@ func decodePiResult(raw json.RawMessage) string {
 // overridden by user-configured custom_args. Overriding these would
 // break the daemon↔Pi communication protocol.
 var piBlockedArgs = map[string]blockedArgMode{
-	"-p":        blockedStandalone, // non-interactive mode
-	"--print":   blockedStandalone, // alias for -p
-	"--mode":    blockedWithValue,  // "json" event stream protocol
-	"--session": blockedWithValue,  // daemon manages the session path
+	"-p":         blockedStandalone, // non-interactive mode
+	"--print":    blockedStandalone, // alias for -p
+	"--mode":     blockedWithValue,  // "json" event stream protocol
+	"--session":  blockedWithValue,  // daemon manages the session path
+	"--thinking": blockedWithValue,  // owned by agent.thinking_level
 }
 
 // piCustomArgModes mirrors Pi 0.83's built-in parser closely enough to
@@ -580,6 +581,7 @@ var piCustomArgModes = map[string]blockedArgMode{
 //	--session <path>            session log file (created upfront, reused on resume)
 //	--provider <name>           provider, when Model is "provider/id"
 //	--model <id>                model identifier
+//	--thinking <level>          per-agent reasoning level override
 //
 // The prompt is deliberately absent from argv. Pi reads a non-TTY stdin in
 // print/JSON mode; using that supported path prevents Windows PowerShell's npm
@@ -600,6 +602,9 @@ func buildPiArgs(sessionPath string, opts ExecOptions, logger *slog.Logger) []st
 		if model != "" {
 			args = append(args, "--model", model)
 		}
+	}
+	if opts.ThinkingLevel != "" {
+		args = append(args, "--thinking", opts.ThinkingLevel)
 	}
 	// Note: we intentionally do NOT pass --tools here. Omitting it lets
 	// Pi use its full tool registry, including user-installed extension

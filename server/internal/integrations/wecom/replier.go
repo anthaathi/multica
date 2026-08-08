@@ -145,8 +145,22 @@ func (r *OutboundReplier) sendBindingPrompt(ctx context.Context, inst engine.Res
 	if err != nil {
 		return fmt.Errorf("wecom: mint binding token: %w", err)
 	}
-	bindURL := r.appURL + r.bindingPath + "?token=" + url.QueryEscape(token.Raw)
-	text := "👋 请先绑定你的 Multica 账号，才能与我对话：\n" + bindURL + "\n（链接 15 分钟内有效）"
+	// The throttle suppressed the mint: a live link is already with this user.
+	// Only its hash was ever stored, so there is no URL to rebuild — point
+	// them at the message they already have. The throttle window is far
+	// shorter than the TTL, so that link still has most of its life left.
+	//
+	// This text is delivered by postPrivate below, which always lands in the
+	// 1:1 — the same conversation the earlier link is sitting in, whichever
+	// room triggered this. So it points up the current thread rather than
+	// telling the reader to go to a chat they are already reading. Only the
+	// group ack further down runs in the room, and it is the one that names
+	// the 1:1.
+	text := "👋 绑定链接刚才已经发给你了，就在上方，请直接点击完成绑定。"
+	if !token.Reused {
+		bindURL := r.appURL + r.bindingPath + "?token=" + url.QueryEscape(token.Raw)
+		text = "👋 请先绑定你的 Multica 账号，才能与我对话：\n" + bindURL + "\n（链接 15 分钟内有效）"
+	}
 	// A binding token is a bearer credential: binding.Redeem only checks that
 	// the redeemer belongs to the token's workspace, and the bind page redeems
 	// on load as whoever is signed in. Sending it to msg.Source.ChatID — which
@@ -156,7 +170,7 @@ func (r *OutboundReplier) sendBindingPrompt(ctx context.Context, inst engine.Res
 	// the link privately to the sender's own userid with chat_type=1 (the same
 	// address outbound.go uses for inbox pushes), never to the room. Lark's
 	// SendBindingPromptCard targets the sender's OpenID for the same reason.
-	if err := r.postPrivate(inst, sender, text); err != nil {
+	if err := r.postPrivate(ctx, inst, sender, text); err != nil {
 		return err
 	}
 	// A group trigger still needs an answer — silence reads as a broken bot —
@@ -172,7 +186,7 @@ func (r *OutboundReplier) sendBindingPrompt(ctx context.Context, inst engine.Res
 // postPrivate delivers text to a single user's 1:1 chat (chat_type=1),
 // regardless of which room triggered the message. Used for bearer-credential
 // content (the binding link) that must never land in a group.
-func (r *OutboundReplier) postPrivate(inst engine.ResolvedInstallation, userID, text string) error {
+func (r *OutboundReplier) postPrivate(ctx context.Context, inst engine.ResolvedInstallation, userID, text string) error {
 	if r.senders == nil {
 		return errors.New("wecom: sender registry not configured")
 	}
@@ -186,7 +200,7 @@ func (r *OutboundReplier) postPrivate(inst engine.ResolvedInstallation, userID, 
 	if sender == nil {
 		return errors.New("wecom: connection not ready")
 	}
-	return sender.sendText(userID, chatTypeSingleInt, text)
+	return sender.sendTextCtx(ctx, userID, chatTypeSingleInt, text)
 }
 
 // post looks up the installation's live wsSender in the registry and
@@ -194,7 +208,6 @@ func (r *OutboundReplier) postPrivate(inst engine.ResolvedInstallation, userID, 
 // ready" when the Supervisor has no active connection (mid-reconnect
 // after lease flip, or right after Revoke).
 func (r *OutboundReplier) post(ctx context.Context, inst engine.ResolvedInstallation, msg channel.InboundMessage, text string) error {
-	_ = ctx
 	if r.senders == nil {
 		return errors.New("wecom: sender registry not configured")
 	}
@@ -210,7 +223,7 @@ func (r *OutboundReplier) post(ctx context.Context, inst engine.ResolvedInstalla
 		return errors.New("wecom: missing chat_id")
 	}
 	chatType := aibotChatTypeFromChannel(msg.Source.ChatType)
-	return sender.sendText(chatID, chatType, text)
+	return sender.sendTextCtx(ctx, chatID, chatType, text)
 }
 
 func issueCreatedText(res engine.Result) string {
@@ -218,7 +231,14 @@ func issueCreatedText(res engine.Result) string {
 	if id == "" {
 		id = fmt.Sprintf("#%d", res.IssueNumber)
 	}
-	title := strings.TrimSpace(res.IssueTitle)
+	// The title is the reporter's own text and this confirmation goes back
+	// into the chat that triggered it — in a group, in front of the room. An
+	// issue titled "安全升级：请点击 [重置密码](https://evil.example) 完成验证"
+	// otherwise comes back from the bot as a working link, with the bot's
+	// authority behind it. A title carrying a line break can define one
+	// instead of writing it inline, which is why the reference-definition
+	// break applies here too.
+	title := breakMemberLinks(strings.TrimSpace(res.IssueTitle))
 	if title == "" {
 		return "✅ 已创建 " + id
 	}
