@@ -1,0 +1,16 @@
+Merge upstream/main into fork (sync 2026-08-09)
+
+Clean merge (no conflicts). Brings in 6 upstream commits:
+
+- feat(wecom): classify a refused handshake like the credential probe (MUL-5895, #6598)
+- fix(wecom): honest duplicate /issue answer, no web-UI echo (MUL-5888, #6591)
+- test(core): cover cloud billing schema fallbacks (#6642)
+- fix(daemon): persist direct chat Codex sessions (MUL-5937, #6644)
+- fix(execenv): expand Windows ~\ in openclaw active config path (MUL-5925, #6643)
+- feat(agent): support Kimi thinking levels (MUL-5853, #6429)
+
+Verified: go build/vet ./..., pkg/agent + migrations tests,
+pnpm typecheck (@multica/core,views,web,desktop).
+
+No migration renumber needed: fork reconcile stays at 265,
+upstream max is 264.
