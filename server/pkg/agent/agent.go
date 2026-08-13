@@ -209,6 +209,14 @@ type Result struct {
 	// network drops, rate limits, quota, provider 5xx, or auth errors. Those
 	// keep the session pointer so the platform's own retry can resume the
 	// truncated conversation (see retryableReasons in internal/service/task.go).
+	//
+	// The auth exclusion above stands even for the one auth error a fresh
+	// session DOES cure — a resumed session whose persisted provider identity
+	// can no longer resolve its credentials (GH #6777). An adapter cannot tell
+	// that apart from a genuinely bad credential by looking at the error, so
+	// the judgement is made once, provider-agnostically, in
+	// shouldRetryWithFreshSession, where "was this run a resume?" is already
+	// known. Do not encode it here.
 	ResumeRejected bool
 	// codexInitializeRetrySafe is provider-internal evidence that an
 	// initialize timeout happened before semantic activity and after the
@@ -420,5 +428,13 @@ var launchHeaders = map[string]string{
 // empty string if the type is unknown. Callers render this as a preview so
 // users understand which command their custom_args get appended to.
 func LaunchHeader(agentType string) string {
-	return launchHeaders[agentType]
+	if h := launchHeaders[agentType]; h != "" {
+		return h
+	}
+	// Built-in runtime identities derive their launch header from the
+	// descriptor, not the protocol-family map.
+	if desc, ok := BuiltinRuntimeByID(agentType); ok {
+		return desc.LaunchHeader
+	}
+	return ""
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { MessageSquareText, MessagesSquare, Webhook } from "lucide-react";
+import { MessageSquareText } from "lucide-react";
 import type { Agent } from "@multica/core/types";
 import { useAuthStore } from "@multica/core/auth";
 import { useWorkspaceId } from "@multica/core/hooks";
@@ -12,9 +12,12 @@ import { dingtalkInstallationsOptions } from "@multica/core/dingtalk";
 import { wecomInstallationsOptions } from "@multica/core/wecom";
 import { memberListOptions } from "@multica/core/workspace/queries";
 import { LarkAgentBindButton } from "../../../settings/components/lark-tab";
+import { LarkMark } from "../../../settings/components/lark-mark";
 import { SlackAgentBindButton } from "../../../settings/components/slack-tab";
 import { MattermostAgentBindButton } from "../../../settings/components/mattermost-tab";
+import { SlackMark } from "../../../settings/components/slack-mark";
 import { DingTalkAgentBindButton } from "../../../settings/components/dingtalk-tab";
+import { DingTalkMark } from "../../../settings/components/dingtalk-mark";
 import { WecomAgentBindButton } from "../../../settings/components/wecom-tab";
 import { WecomMark } from "../../../settings/components/wecom-mark";
 import { useT } from "../../../i18n";
@@ -139,7 +142,7 @@ export function IntegrationsTab({ agent }: { agent: Agent }) {
       <section className="rounded-lg border">
         <div className="flex items-start gap-3 p-4">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border bg-muted/40 text-muted-foreground">
-            <Webhook className="h-4 w-4" />
+            <LarkMark className="h-4 w-4" />
           </span>
           <div className="min-w-0 flex-1 space-y-1">
             <h3 className="text-body font-medium">{ts(($) => $.lark.section_title)}</h3>
@@ -186,7 +189,7 @@ export function IntegrationsTab({ agent }: { agent: Agent }) {
       <section className="rounded-lg border">
         <div className="flex items-start gap-3 p-4">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border bg-muted/40 text-muted-foreground">
-            <MessagesSquare className="h-4 w-4" />
+            <SlackMark className="h-4 w-4" />
           </span>
           <div className="min-w-0 flex-1 space-y-1">
             <h3 className="text-body font-medium">{ts(($) => $.slack.section_title)}</h3>
@@ -263,7 +266,7 @@ export function IntegrationsTab({ agent }: { agent: Agent }) {
       <section className="rounded-lg border">
         <div className="flex items-start gap-3 p-4">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border bg-muted/40 text-muted-foreground">
-            <MessagesSquare className="h-4 w-4" />
+            <DingTalkMark className="h-5 w-5" />
           </span>
           <div className="min-w-0 flex-1 space-y-1">
             <h3 className="text-body font-medium">{ts(($) => $.dingtalk.section_title)}</h3>

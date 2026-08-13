@@ -300,7 +300,7 @@ func TestPrepareThenCleanupSidecarsPreservesUnrelatedUserFiles(t *testing.T) {
 		{"copilot", filepath.Join(".github", "CODEOWNERS")},
 		{"opencode", filepath.Join(".opencode", "config.json")},
 		{"pi", filepath.Join(".pi", "config.toml")},
-		{"omp", filepath.Join(".omp", "config.yml")},
+		{"omp", filepath.Join(".omp", "config.toml")},
 		{"cursor", filepath.Join(".cursor", "settings.json")},
 		{"kimi", filepath.Join(".kimi", "config.json")},
 		{"reasonix", filepath.Join(".reasonix", "config.toml")},

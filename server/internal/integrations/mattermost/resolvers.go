@@ -302,6 +302,10 @@ func (r *sessionBinder) EnsureSession(ctx context.Context, p engine.EnsureSessio
 	})
 }
 
+func (r *sessionBinder) MarkPendingFresh(ctx context.Context, sessionID pgtype.UUID) error {
+	return r.session.MarkPendingFresh(ctx, sessionID)
+}
+
 func (r *sessionBinder) AppendMessage(ctx context.Context, p engine.AppendParams) (engine.AppendResult, error) {
 	_, _, replyThread := mattermostSessionRouting(p.Message)
 	return r.session.AppendUserMessage(ctx, engine.AppendInput{
