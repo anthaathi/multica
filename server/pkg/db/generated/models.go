@@ -162,6 +162,7 @@ type AgentTaskQueue struct {
 	QuickActionsDisabled      bool        `json:"quick_actions_disabled"`
 	RegenerateQuickActionsFor pgtype.UUID `json:"regenerate_quick_actions_for"`
 	PluginExecutionManifestID pgtype.UUID `json:"plugin_execution_manifest_id"`
+	BranchName                pgtype.Text `json:"branch_name"`
 }
 
 type AgentToLabel struct {
@@ -508,6 +509,19 @@ type DaemonToken struct {
 	ExpiresAt   pgtype.Timestamptz `json:"expires_at"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 }
+
+type DingtalkGroupRoute struct {
+	ID                pgtype.UUID        `json:"id"`
+	WorkspaceID       pgtype.UUID        `json:"workspace_id"`
+	InstallationID    pgtype.UUID        `json:"installation_id"`
+	ConversationID    string             `json:"conversation_id"`
+	ConversationTitle string             `json:"conversation_title"`
+	AgentID           pgtype.UUID        `json:"agent_id"`
+	Revision          int64              `json:"revision"`
+	DiscoveredAt      pgtype.Timestamptz `json:"discovered_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+}
+
 
 type ExternalCommentLink struct {
 	ID                pgtype.UUID        `json:"id"`
@@ -1131,14 +1145,15 @@ type PluginHealth struct {
 }
 
 type PluginIdentity struct {
-	ID            pgtype.UUID        `json:"id"`
-	PluginKey     string             `json:"plugin_key"`
-	DisplayName   string             `json:"display_name"`
-	PublisherID   string             `json:"publisher_id"`
-	PublisherType string             `json:"publisher_type"`
-	TrustTier     string             `json:"trust_tier"`
-	CreatedAt     pgtype.Timestamptz `json:"created_at"`
-	RetiredAt     pgtype.Timestamptz `json:"retired_at"`
+	ID               pgtype.UUID        `json:"id"`
+	PluginKey        string             `json:"plugin_key"`
+	DisplayName      string             `json:"display_name"`
+	PublisherID      string             `json:"publisher_id"`
+	PublisherType    string             `json:"publisher_type"`
+	TrustTier        string             `json:"trust_tier"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	RetiredAt        pgtype.Timestamptz `json:"retired_at"`
+	OwnerWorkspaceID pgtype.UUID        `json:"owner_workspace_id"`
 }
 
 type PluginInstallation struct {

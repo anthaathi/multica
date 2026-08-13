@@ -17,6 +17,38 @@ var MinVersions = map[string]string{
 	"qwen":    "0.20.0",  // stream-json protocol captured and verified against Qwen Code 0.20.0
 }
 
+// MinQuickCreateCLIVersion gates the agent-create (quick-create) flow against
+// the multica CLI version reported by the daemon at registration time. The
+// quick-create prompt that the agent runs depends on CLI behavior introduced
+// after this version (attachment URL handling, quick-create attachment
+// binding, no-retry semantics on `multica issue create` failure — see PR
+// #1851); older daemons would either double-create issues or mishandle pasted
+// screenshot URLs. Treated as a hard requirement: missing / unparsable / below
+// this threshold all fail closed.
+const MinQuickCreateCLIVersion = "0.2.21"
+
+// MinQuickCreateFieldsCLIVersion is the first daemon release that carries
+// explicit quick-create priority and due-date fields from the claim response
+// into the generated issue-create prompt. Basic quick-create remains on the
+// older floor above; only requests using these optional fields need this gate.
+const MinQuickCreateFieldsCLIVersion = "0.4.3"
+
+// MinLocalWorktreeCLIVersion is the release that first shipped
+// execution_mode=worktree for local_directory resources (MUL-5707).
+//
+// NOTHING GATES ON THIS. It is a display value: the number shown in the 422
+// payload and the UI hint so a user knows roughly which release to update to.
+// The gates themselves read protocol.DaemonCapabilityLocalWorktreeV1, which
+// the daemon advertises only when it actually implements the mode.
+//
+// It stopped being a gate because it could not be one. A daemon without the
+// implementation does not lose a field — it runs the task IN PLACE, editing the
+// working copy the user asked to isolate. Version strings cannot answer that:
+// CheckMinCLIVersionFor exempts git-describe dev builds so `make daemon` stays
+// unblocked, and a v0.4.23-era daemon reporting "v0.4.21-24-gcd3c0bb89" sailed
+// through the floor and ran two tasks in the user's own directory.
+const MinLocalWorktreeCLIVersion = "0.4.24"
+
 // MinHandoffCLIVersion is the lowest multica CLI version whose daemon renders
 // the assignment handoff note into the run's opening prompt + issue_context.md
 // (MUL-3375). Unlike quick-create this is a SOFT gate: assigning an issue with

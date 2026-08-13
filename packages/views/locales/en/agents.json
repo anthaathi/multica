@@ -401,7 +401,7 @@
     "runtime_none": "No runtime available",
     "runtime_cloud_badge": "Cloud",
     "runtime_private_badge": "Private",
-    "runtime_private_locked_tooltip": "Private runtime — only its owner or a workspace admin can create agents on it. Ask the owner to switch it to Public to share.",
+    "runtime_private_locked_tooltip": "Private runtime — only its owner can create agents on it. Ask the owner to switch it to Public to share.",
     "runtime_search_placeholder": "Search machines…",
     "runtime_no_results": "No matching machines",
     "runtime_group_online": "{{online}}/{{total}} online",
@@ -844,7 +844,10 @@
     "details_cache_read": "Cache read",
     "details_cache_write": "Cache write",
     "details_cost": "Cost",
-    "usage_chip_title": "Tokens and estimated cost for this run"
+    "usage_chip_title": "Tokens and estimated cost for this run",
+    "details_branch": "Branch",
+    "details_reason": "Reason",
+    "copy_branch": "Copy branch name"
   },
   "task_failure": {
     "agent_error": "Agent execution error",

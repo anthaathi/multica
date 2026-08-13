@@ -55,6 +55,7 @@ var workspaceDeletionManifest = map[string]workspaceDeleteAction{
 	"external_comment_link":             workspaceDelete,
 	"external_identity":                 workspaceDelete,
 	"external_issue_link":               workspaceDelete,
+	"dingtalk_group_route":              workspaceDelete,
 	"feedback":                          workspaceDeleteDetach,
 	"github_installation":               workspaceDelete,
 	"github_pending_check_suite":        workspaceDelete,
