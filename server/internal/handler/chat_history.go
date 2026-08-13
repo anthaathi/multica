@@ -62,13 +62,22 @@ func (h *Handler) GetChatChannelHistory(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	readers := h.chatHistoryReaders()
-	if len(readers) == 0 {
-		h.writeNoChannelIntegration(w)
-		return
+	var page channel.HistoryPage
+	var err error
+	if len(readers) > 0 {
+		page, err = readChannelHistory(readers, func(reader ChatChannelHistoryReader) (channel.HistoryPage, error) {
+			return reader.ChannelOverview(r.Context(), sessionID, historyOptionsFrom(r))
+		})
 	}
-	page, err := readChannelHistory(readers, func(reader ChatChannelHistoryReader) (channel.HistoryPage, error) {
-		return reader.ChannelOverview(r.Context(), sessionID, historyOptionsFrom(r))
-	})
+	// No configured IM reader recognized the session (none configured, or every
+	// reader returned its "not bound to my channel" sentinel). Web chat,
+	// Feishu, WeCom and DingTalk persist their transcript to chat_message, so
+	// serve that stored transcript instead of dead-ending on a "no channel
+	// integration" note — a no-Slack self-host is exactly the target of the
+	// transcript read-back feature.
+	if len(readers) == 0 || isNoChannelSession(err) {
+		page, err = h.chatMessageHistory(r, sessionID)
+	}
 	h.respondChatHistory(w, r, sessionID, page, err)
 }
 

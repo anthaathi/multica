@@ -589,10 +589,11 @@ func TestChatChannelHistory_MattermostFallThrough(t *testing.T) {
 }
 
 // When NEITHER platform owns the session (Slack ErrNoSlackSession AND Mattermost
-// ErrNoMattermostSession), the terminal not-found case maps to the friendly
-// "not connected to a chat channel" note (200), not an error — see
-// respondChatHistory's isNoChannelSession branch.
-func TestChatChannelHistory_BothNoSessionNote(t *testing.T) {
+// ErrNoMattermostSession), the endpoint falls back to the stored chat_message
+// transcript — the session is web chat / Feishu / etc., whose history lives in
+// Multica rather than an IM channel. A fresh session has no messages, so the
+// fallback returns an empty page with no note.
+func TestChatChannelHistory_BothNoSessionFallsBackToTranscript(t *testing.T) {
 	if testHandler == nil {
 		t.Skip("requires test database")
 	}
@@ -604,14 +605,14 @@ func TestChatChannelHistory_BothNoSessionNote(t *testing.T) {
 	testHandler.GetChatChannelHistory(w, taskActorReq("/api/chat/history", taskID))
 
 	if w.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200 (note), body: %s", w.Code, w.Body.String())
+		t.Fatalf("status = %d, want 200, body: %s", w.Code, w.Body.String())
 	}
 	var resp ChatChannelHistoryResponse
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if resp.Note == "" || len(resp.Messages) != 0 {
-		t.Fatalf("expected empty messages + a note when no platform backs the session, got %+v", resp)
+	if resp.Note != "" || len(resp.Messages) != 0 {
+		t.Fatalf("expected empty transcript with no note when no platform backs the session, got %+v", resp)
 	}
 }
 
