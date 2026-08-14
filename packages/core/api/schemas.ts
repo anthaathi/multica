@@ -25,6 +25,9 @@ import type {
   WorkspaceSubscriptionSummary,
   WorkspaceSubscriptionPrice,
   WorkspaceSubscriptionPrices,
+  CreateWorkspaceSubscriptionCheckoutResponse,
+  WorkspaceSubscriptionSeatReconcileResult,
+  CreateWorkspaceSubscriptionPortalResponse,
   CronPreviewResponse,
   DingTalkGroupRoute,
   DingTalkInstallation,
@@ -67,6 +70,7 @@ import type {
   TimelineEntry,
   User,
   WebhookDelivery,
+  WorkspaceMcpServer,
 } from "../types";
 import type { CloudRuntimeNode } from "../runtimes/cloud-runtime";
 import type { CreateFeedbackResponse } from "../feedback/types";
@@ -2178,6 +2182,15 @@ export const EMPTY_CREATE_BILLING_PORTAL_SESSION_RESPONSE: CreateBillingPortalSe
 
 const WorkspaceSubscriptionIntervalSchema = z.enum(["month", "year"]);
 
+// Stripe hosts Checkout and Portal, so those URLs leave the app. `z.string()
+// .url()` is not enough on its own — `new URL("javascript:...")` parses — and
+// the caller hands this value to location.assign, so the scheme is pinned here.
+const StripeHostedURLSchema = z.string().url().refine(
+  (value) => value.startsWith("https://"),
+  { message: "Stripe hosted URL must use HTTPS" },
+);
+
+
 export const WorkspaceSubscriptionEntitlementsSchema = z
   .object({
     workspace_id: z.string(),
@@ -2248,7 +2261,7 @@ const WorkspaceSubscriptionPriceSchema = (
       // quote a yearly amount as a monthly one — the schema is an independent
       // boundary, so it checks the correspondence itself.
       interval: z.literal(expected),
-      interval_count: z.number().int().positive(),
+      interval_count: z.literal(1),
     })
     .loose()
     .transform(
@@ -2270,6 +2283,49 @@ export const WorkspaceSubscriptionPricesSchema = z
     (value): WorkspaceSubscriptionPrices => ({
       month: value.month,
       year: value.year,
+    }),
+  );
+
+export const CreateWorkspaceSubscriptionCheckoutResponseSchema = z
+  .object({
+    request_id: z.string(),
+    session_id: z.string(),
+    url: StripeHostedURLSchema,
+  })
+  .loose()
+  .transform(
+    (value): CreateWorkspaceSubscriptionCheckoutResponse => ({
+      requestId: value.request_id,
+      sessionId: value.session_id,
+      url: value.url,
+    }),
+  );
+
+export const WorkspaceSubscriptionSeatReconcileResultSchema = z
+  .object({
+    workspace_id: z.string(),
+    billed_seats: z.number().int().nonnegative(),
+    actual_seats: z.number().int().nonnegative(),
+    action: z.string(),
+  })
+  .loose()
+  .transform(
+    (value): WorkspaceSubscriptionSeatReconcileResult => ({
+      workspaceId: value.workspace_id,
+      billedSeats: value.billed_seats,
+      actualSeats: value.actual_seats,
+      action: value.action,
+    }),
+  );
+
+export const CreateWorkspaceSubscriptionPortalResponseSchema = z
+  .object({
+    url: StripeHostedURLSchema,
+  })
+  .loose()
+  .transform(
+    (value): CreateWorkspaceSubscriptionPortalResponse => ({
+      url: value.url,
     }),
   );
 
@@ -2510,4 +2566,38 @@ export const EMPTY_SKILL: Skill = {
   created_at: "",
   updated_at: "",
   files: [],
+};
+
+/**
+ * Read shape of one workspace MCP server.
+ *
+ * This is the ONLY schema in this file that must not be `.loose()`. Everywhere
+ * else, keeping unknown fields is forward-compatibility; here it would be a
+ * hole in the write-only boundary — a server that regressed to returning the
+ * stored entry (or a `url` / `headers` on the summary) would have it land in
+ * the parsed object and in the query cache. zod strips unknown keys by
+ * default, so the client only ever holds the safe summary.
+ *
+ * `transport` stays a plain string (not an enum) so an unknown value from a
+ * newer backend still parses — the UI has a default branch for it.
+ */
+export const WorkspaceMcpServerSchema = z.object({
+  id: z.string().default(""),
+  workspace_id: z.string().default(""),
+  name: z.string().default(""),
+  transport: z.string().default("unknown"),
+  enabled: z.boolean().optional(),
+  created_at: z.string().default(""),
+  updated_at: z.string().default(""),
+});
+
+export const WorkspaceMcpServerListSchema = z.array(WorkspaceMcpServerSchema);
+
+export const EMPTY_WORKSPACE_MCP_SERVER: WorkspaceMcpServer = {
+  id: "",
+  workspace_id: "",
+  name: "",
+  transport: "unknown",
+  created_at: "",
+  updated_at: "",
 };

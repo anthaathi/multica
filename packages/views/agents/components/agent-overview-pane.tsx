@@ -443,6 +443,7 @@ export function AgentOverviewPane({
                     <McpConfigTab
                       agent={agent}
                       runtime={runtime}
+                      canEdit={canEdit}
                       onSave={(updates) => onUpdate(agent.id, updates)}
                       onDirtyChange={setActiveDirty}
                     />

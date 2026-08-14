@@ -13,7 +13,11 @@
 -- 263 (263_issue_origin_wecom_chat + 264_issue_origin_wecom_chat_validate,
 -- sync 2026-08-07), then 265 (265_issue_view, sync 2026-08-12), then 300
 -- (collision with upstream 300_drop_redundant_issue_workspace_number_index,
--- upstream max 313_runtime_profile_add_dsh, sync 2026-08-13); runs last so
+-- upstream max 313_runtime_profile_add_dsh, sync 2026-08-13), then 314
+-- (upstream 314-318 workspace MCP family: workspace_mcp_config,
+-- workspace_mcp_server, workspace_mcp_server_name_unique,
+-- agent_mcp_server_server_index, drop_workspace_mcp_config;
+-- sync 2026-08-15); runs last so
 -- the union survives regardless of which same-prefix 149 migration ran.
 --
 -- This rebuild must carry every value added by earlier issue_origin_*
