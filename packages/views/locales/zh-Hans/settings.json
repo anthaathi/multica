@@ -425,6 +425,28 @@
     "byo_success_toast": "Mattermost 机器人已连接",
     "byo_failed_toast": "无法连接 Mattermost 机器人"
   },
+  "mcp": {
+    "add_server": "添加服务",
+    "added_toast": "已添加共享 MCP 服务",
+    "admin_only_note": "只有工作区 owner 和 admin 可以修改共享的 MCP 服务。",
+    "cancel": "取消",
+    "delete_confirm": "移除",
+    "delete_description": "{{name}} 将从服务库以及所有已分配的智能体上移除，在它们的下一个任务起生效。",
+    "delete_title": "移除共享服务？",
+    "description": "本工作区的 MCP 服务库。在这里添加不会分配给任何智能体——由智能体的负责人在该智能体自己的 MCP 页里分配，并可按智能体单独开关。",
+    "disabled_badge": "已禁用",
+    "edit_server": "编辑服务",
+    "empty_description": "先在这里添加服务，再到需要用它的智能体的 MCP 页里分配。",
+    "empty_title": "还没有共享的 MCP 服务",
+    "remove_failed_toast": "共享 MCP 服务移除失败",
+    "remove_server": "移除服务",
+    "removed_toast": "已移除共享 MCP 服务",
+    "save_failed_toast": "共享 MCP 服务保存失败",
+    "servers_title": "共享服务",
+    "title": "MCP",
+    "updated_toast": "已更新共享 MCP 服务",
+    "write_only_note": "已保存的配置是只写的——URL、命令、请求头和环境变量不会再次展示，因此编辑一个服务等于整条替换它的配置。改名是安全的：已分配的智能体不受影响。"
+  },
   "members": {
     "cannot_demote_last_owner": "不能降级最后一位所有者",
     "cannot_demote_last_owner_title": "请先把另一位成员升级为所有者——工作区必须至少保留一位所有者。",
@@ -516,6 +538,7 @@
   "page": {
     "my_account": "我的账号",
     "tabs": {
+      "billing": "账单与套餐",
       "chat": "聊天",
       "general": "通用",
       "github": "GitHub",
@@ -525,6 +548,7 @@
       "jira": "Jira",
       "labels": "标签",
       "labs": "实验室",
+      "mcp": "MCP",
       "members": "成员",
       "notifications": "通知",
       "plugins": "Plugins",
@@ -534,9 +558,7 @@
       "quick_actions": "快捷操作",
       "repositories": "代码仓库",
       "shortcuts": "快捷键",
-      "tokens": "API Token",
-      "billing": "账单与套餐",
-      "mcp": "MCP"
+      "tokens": "API Token"
     },
     "title": "设置",
     "workspace_fallback": "工作区"
@@ -574,6 +596,66 @@
     "private_upload": "工作区私有上传",
     "read_only": "只读访问",
     "read_only_description": "工作区 owner 和 admin 可以安装 Plugin 或更改绑定。",
+    "remote_mcp": {
+      "title": "Remote MCP 连接",
+      "endpoint": "HTTPS 端点",
+      "endpoint_placeholder": "https://mcp.example.com/mcp",
+      "auth": "身份验证",
+      "auth_types": {
+        "none": "无",
+        "oauth": "OAuth（推荐）",
+        "bearer": "Bearer 令牌",
+        "header": "自定义请求头"
+      },
+      "header_name": "请求头名称",
+      "credential": "凭证（加密存储）",
+      "connect": "连接",
+      "connected": "已连接",
+      "ready_to_connect": "可以连接",
+      "complete_before_enabling": "请先连接 MCP 并批准至少一个工具，再启用作用范围。",
+      "advanced": "高级配置",
+      "oauth_scope": "OAuth scopes（留空自动获取）",
+      "oauth_client_id": "OAuth client ID（留空自动注册）",
+      "oauth_client_secret": "OAuth client secret",
+      "oauth_authorization_endpoint": "Authorization endpoint 覆盖值",
+      "oauth_token_endpoint": "Token endpoint 覆盖值",
+      "oauth_token_auth_method": "Token endpoint 认证方式",
+      "oauth_token_auth_methods": {
+        "none": "公开客户端（PKCE）",
+        "client_secret_basic": "Client secret（HTTP Basic）",
+        "client_secret_post": "Client secret（请求体）"
+      },
+      "public_config": "公开配置（JSON 对象）",
+      "invalid_public_config": "公开配置必须是有效的 JSON 对象",
+      "failure_policy": "失败策略",
+      "failure_policies": {
+        "required": "必需 — 停止任务",
+        "optional": "可选 — 不使用工具并继续"
+      },
+      "configure_and_discover": "保存并发现工具",
+      "test": "测试连接",
+      "approve": "批准所选工具",
+      "revoke": "吊销凭证",
+      "credential_states": {
+        "configured": "已配置凭证",
+        "revoked": "凭证已吊销",
+        "missing": "缺少凭证",
+        "not_required": "无需凭证"
+      },
+      "reviewed": "工具已批准",
+      "pending_review": "需要批准",
+      "approved_tools": "已批准的工具",
+      "no_tools": "服务器未公布任何工具。",
+      "discovery": "已发现的工具 — 请明确审核访问权限",
+      "read": "读取",
+      "write": "写入",
+      "configured_success": "连接已保存；请审核已发现的工具",
+      "oauth_connected_success": "OAuth 连接已完成；请审核已发现的工具",
+      "oauth_connect_failed": "OAuth 连接未能完成，请重试。",
+      "test_success": "连接测试成功",
+      "approved_success": "工具访问权限已批准",
+      "revoked_success": "凭证已吊销，Plugin 已禁用"
+    },
     "review": {
       "compatibility": "兼容性",
       "contributes": "贡献内容",
@@ -793,6 +875,10 @@
   },
   "shortcuts": {
     "actions": {
+      "archiveInboxItem": {
+        "description": "归档当前打开的收件箱通知；在归档列表中则取消归档。",
+        "label": "归档通知"
+      },
       "createIssue": {
         "description": "打开你常用的任务创建流程。",
         "label": "新建任务"
@@ -876,10 +962,6 @@
       "toggleSidebar": {
         "description": "切换主侧边栏的显示状态。",
         "label": "显示或隐藏侧边栏"
-      },
-      "archiveInboxItem": {
-        "label": "归档通知",
-        "description": "归档当前打开的收件箱通知；在归档列表中则取消归档。"
       }
     },
     "categories": {
@@ -1136,27 +1218,5 @@
     "toast_logo_updated": "工作区图标已更新",
     "toast_save_failed": "保存工作区设置失败",
     "toast_saved": "已保存工作区设置"
-  },
-  "mcp": {
-    "title": "MCP",
-    "description": "本工作区的 MCP 服务库。在这里添加不会分配给任何智能体——由智能体的负责人在该智能体自己的 MCP 页里分配，并可按智能体单独开关。",
-    "servers_title": "共享服务",
-    "write_only_note": "已保存的配置是只写的——URL、命令、请求头和环境变量不会再次展示，因此编辑一个服务等于整条替换它的配置。改名是安全的：已分配的智能体不受影响。",
-    "add_server": "添加服务",
-    "edit_server": "编辑服务",
-    "remove_server": "移除服务",
-    "empty_title": "还没有共享的 MCP 服务",
-    "empty_description": "先在这里添加服务，再到需要用它的智能体的 MCP 页里分配。",
-    "disabled_badge": "已禁用",
-    "admin_only_note": "只有工作区 owner 和 admin 可以修改共享的 MCP 服务。",
-    "delete_title": "移除共享服务？",
-    "delete_description": "{{name}} 将从服务库以及所有已分配的智能体上移除，在它们的下一个任务起生效。",
-    "delete_confirm": "移除",
-    "cancel": "取消",
-    "added_toast": "已添加共享 MCP 服务",
-    "updated_toast": "已更新共享 MCP 服务",
-    "removed_toast": "已移除共享 MCP 服务",
-    "save_failed_toast": "共享 MCP 服务保存失败",
-    "remove_failed_toast": "共享 MCP 服务移除失败"
   }
 }

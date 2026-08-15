@@ -17,7 +17,9 @@
 -- (upstream 314-318 workspace MCP family: workspace_mcp_config,
 -- workspace_mcp_server, workspace_mcp_server_name_unique,
 -- agent_mcp_server_server_index, drop_workspace_mcp_config;
--- sync 2026-08-15); runs last so
+-- sync 2026-08-15), then 327 (upstream 319-326 remote MCP plugin family:
+-- remote_mcp_plugin_v1, plugin installation config/secret indexes,
+-- plugin_remote_mcp_oauth + state expiry index; sync 2026-08-16); runs last so
 -- the union survives regardless of which same-prefix 149 migration ran.
 --
 -- This rebuild must carry every value added by earlier issue_origin_*
