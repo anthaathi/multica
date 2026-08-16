@@ -979,7 +979,8 @@
       "reset_zoom": "重置缩放",
       "title": "固定的系统快捷键",
       "zoom_in": "放大",
-      "zoom_out": "缩小"
+      "zoom_out": "缩小",
+      "open_settings": "打开设置"
     },
     "no_results": "没有匹配的快捷键操作。",
     "record_aria": "修改「{{action}}」的快捷键",

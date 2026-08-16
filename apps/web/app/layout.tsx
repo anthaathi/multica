@@ -83,6 +83,22 @@ export const metadata: Metadata = {
   icons: {
     icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
     shortcut: ["/favicon.svg"],
+    // iOS never reads the manifest's icons for the home screen; it needs its
+    // own opaque, full-bleed square and rounds the corners itself.
+    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180" }],
+  },
+  // Home-screen behaviour: launch without browser chrome, and label the icon
+  // "Multica" rather than the long SEO <title>. `capable` renders the
+  // standardised `mobile-web-app-capable` tag — Next 16 no longer emits the
+  // deprecated apple-prefixed spelling, so iOS standalone rides on the
+  // manifest's `display` instead (honoured since iOS 16.4).
+  appleWebApp: {
+    capable: true,
+    title: "Multica",
+    // `default` keeps the web view below the status bar. Going edge-to-edge
+    // (`black-translucent` + viewport-fit=cover) needs env(safe-area-inset-*)
+    // padding, which no surface in the app has yet.
+    statusBarStyle: "default",
   },
   openGraph: {
     type: "website",

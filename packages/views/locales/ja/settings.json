@@ -979,7 +979,8 @@
       "reset_zoom": "ズームをリセット",
       "title": "固定のシステムショートカット",
       "zoom_in": "拡大",
-      "zoom_out": "縮小"
+      "zoom_out": "縮小",
+      "open_settings": "設定を開く"
     },
     "no_results": "一致するショートカット操作はありません。",
     "record_aria": "{{action}}のショートカットを変更",

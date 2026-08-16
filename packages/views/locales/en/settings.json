@@ -980,7 +980,8 @@
       "reset_zoom": "Reset zoom",
       "title": "Fixed system shortcuts",
       "zoom_in": "Zoom in",
-      "zoom_out": "Zoom out"
+      "zoom_out": "Zoom out",
+      "open_settings": "Open Settings"
     },
     "no_results": "No matching shortcut actions.",
     "record_aria": "Change shortcut for {{action}}",
