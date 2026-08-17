@@ -422,3 +422,19 @@ func TestOmpRealJSONSmoke(t *testing.T) {
 		t.Fatal("timeout waiting for real omp result")
 	}
 }
+
+// TestDiscoverOmpModelsMissingBinary verifies that a missing omp binary
+// degrades to an empty catalog, not an error — the UI's manual-entry fallback
+// depends on it. Mirrors upstream's test but against the fork's dedicated
+// discoverOmpModels (Command-based since MUL-6260's launch-prefix change).
+func TestDiscoverOmpModelsMissingBinary(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	models, err := discoverOmpModels(ctx, Command{Path: "/nonexistent/omp-binary"})
+	if err != nil {
+		t.Fatalf("discoverOmpModels: %v", err)
+	}
+	if len(models) != 0 {
+		t.Fatalf("expected 0 models for missing binary, got %d", len(models))
+	}
+}

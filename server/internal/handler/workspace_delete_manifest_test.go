@@ -75,6 +75,7 @@ var workspaceDeletionManifest = map[string]workspaceDeleteAction{
 	"issue_property":                    workspaceDelete,
 	"issue_pull_request":                workspaceDelete,
 	"issue_reaction":                    workspaceDelete,
+	"issue_status":                      workspaceDelete,
 	"issue_subscriber":                  workspaceDelete,
 	"issue_sync_outbox":                 workspaceDelete,
 	"issue_sync_source":                 workspaceDelete,
@@ -136,6 +137,7 @@ var workspaceDeletionManifest = map[string]workspaceDeleteAction{
 	"webhook_delivery":                  workspaceDelete,
 	"workspace":                         workspaceDelete,
 	"workspace_invitation":              workspaceDelete,
+	"workspace_share_link":              workspaceDelete,
 }
 
 func TestWorkspaceDeletionManifestCoversPublicSchema(t *testing.T) {

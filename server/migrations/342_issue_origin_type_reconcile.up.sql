@@ -19,8 +19,10 @@
 -- agent_mcp_server_server_index, drop_workspace_mcp_config;
 -- sync 2026-08-15), then 327 (upstream 319-326 remote MCP plugin family:
 -- remote_mcp_plugin_v1, plugin installation config/secret indexes,
--- plugin_remote_mcp_oauth + state expiry index; sync 2026-08-16); runs last so
--- the union survives regardless of which same-prefix 149 migration ran.
+-- plugin_remote_mcp_oauth + state expiry index; sync 2026-08-16), then 342
+-- (upstream 327-341: workspace share-link family, per-workspace issue-status
+-- catalog family, 341_issue_property_actor_types; sync 2026-08-18); runs last
+-- so the union survives regardless of which same-prefix 149 migration ran.
 --
 -- This rebuild must carry every value added by earlier issue_origin_*
 -- migrations, including upstream's new 'wecom_chat' (263) and the fork's
