@@ -70,7 +70,8 @@
     "active_count_other": "フィルター {{count}} 件",
     "in_view": "このビューに含まれています",
     "chip_edit": "編集",
-    "chip_save_as": "別名で保存"
+    "chip_save_as": "別名で保存",
+    "search_status": "ステータスを検索..."
   },
   "display": {
     "tooltip": "表示設定",
@@ -764,5 +765,15 @@
     "syncing": "同期中…",
     "push_queued": "{{provider}} への同期をキューに追加しました",
     "push_failed": "同期に失敗しました：{{error}}"
+  },
+  "status_catalog_error": {
+    "title": "ステータス一覧を読み込めませんでした",
+    "hint": "これがないとステータスの絞り込みを適用できないため、イシューは表示されません。",
+    "retry": "再試行"
+  },
+  "plugins": {
+    "panels": "Plugins",
+    "surface_failed": "{{name}} のインターフェースを読み込めませんでした。",
+    "surface_local_only": "{{name}} はローカルソースからインストールされているため、ブラウザでインターフェースを読み込めません。"
   }
 }

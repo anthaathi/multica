@@ -72,7 +72,8 @@
     "active_count_other": "{{count}} filters",
     "in_view": "Already in this view",
     "chip_edit": "Edit",
-    "chip_save_as": "Save as"
+    "chip_save_as": "Save as",
+    "search_status": "Search status..."
   },
   "display": {
     "tooltip": "Display settings",
@@ -794,5 +795,15 @@
     "syncing": "Syncing…",
     "push_queued": "Queued sync to {{provider}}",
     "push_failed": "Sync failed: {{error}}"
+  },
+  "status_catalog_error": {
+    "title": "Couldn't load the status list",
+    "hint": "Issues are hidden until it loads, because a status filter can't be applied without it.",
+    "retry": "Try again"
+  },
+  "plugins": {
+    "panels": "Plugins",
+    "surface_failed": "{{name}} could not load its interface.",
+    "surface_local_only": "{{name}} was installed from a local source, so its interface cannot be loaded in the browser."
   }
 }

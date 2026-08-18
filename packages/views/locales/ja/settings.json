@@ -135,7 +135,8 @@
     "revoked_badge": "取り消し済み",
     "section_title": "DingTalk",
     "toast_disconnect_failed": "切断に失敗しました",
-    "toast_disconnected": "DingTalk ボットを切断しました"
+    "toast_disconnected": "DingTalk ボットを切断しました",
+    "identity_label": "連携済みの DingTalk ID：{{identity}}"
   },
   "github": {
     "connect_disabled_tooltip": "このサーバーには GitHub App が設定されていません",
@@ -578,7 +579,8 @@
       "quick_actions": "クイックアクション",
       "repositories": "リポジトリ",
       "shortcuts": "ショートカット",
-      "tokens": "API トークン"
+      "tokens": "API トークン",
+      "issue_statuses": "ステータス"
     },
     "title": "設定",
     "workspace_fallback": "ワークスペース"
@@ -603,7 +605,12 @@
     "health": "状態:",
     "incompatible": "互換性のない release",
     "incompatible_description": "新しい Host API またはデーモン機能が必要なため、有効化できません。",
-    "install": "インストール",
+    "install": {
+      "title": "Plugin をインストール",
+      "description": "Plugin manifest の URL を貼り付けてください。インストール前に要求される権限を確認できます。",
+      "placeholder": "https://example.com/multica.plugin.json",
+      "review": "権限を確認"
+    },
     "install_disabled_hint": "インストール後は無効です。ワークスペースまたはエージェントのスコープを選択してください。",
     "installed_disabled": "Plugin を無効のままインストールしました",
     "load_failed": "Plugins を読み込めませんでした",
@@ -705,7 +712,45 @@
     "upgrade_to": "v{{version}} にアップグレード",
     "upgraded": "Plugin をアップグレードしました",
     "uploaded_by": "アップロード者",
-    "workspace_scope": "ワークスペース"
+    "workspace_scope": "ワークスペース",
+    "enabled_label": "Plugin を有効化",
+    "granted_scopes": "許可したアクセス",
+    "contributes": "提供する機能",
+    "version": "v{{version}}",
+    "byline": "{{author}} · v{{version}}",
+    "installed": {
+      "title": "インストール済み"
+    },
+    "consent": {
+      "title": "この Plugin は次のアクセスを要求しています",
+      "description": "Multica はサーバー上で Plugin のコードを実行しません。Plugin はこれらの権限の範囲内でのみ動作し、利用者本人の権限を超えることはありません。",
+      "cancel": "キャンセル",
+      "confirm": "許可してインストール",
+      "confirm_upgrade": "許可してアップグレード",
+      "installed": "Plugin をインストールしました",
+      "upgrade_from": " · v{{version}} からアップグレード",
+      "new_scope": "新規"
+    },
+    "config": {
+      "title": "設定",
+      "save": "保存",
+      "saved": "設定を保存しました",
+      "secret_set": "保存済み — 新しい値を入力すると置き換わります"
+    },
+    "scopes": {
+      "issues_read": "issue を読み取る",
+      "issues_write": "issue を作成・編集する",
+      "comments_read": "コメントを読み取る",
+      "comments_write": "コメントを投稿する",
+      "tasks_read": "agent task を読み取る",
+      "tasks_write": "agent task を開始・更新する",
+      "agents_read": "agent 一覧を読み取る",
+      "members_read": "メンバー一覧を読み取る",
+      "storage_user": "メンバーごとにデータを保存する",
+      "storage_workspace": "ワークスペース共有のデータを保存する",
+      "net": "{{domain}} にデータを送信する",
+      "unknown": "認識できない権限です — インストールしないでください"
+    }
   },
   "preferences": {
     "general_title": "一般",
@@ -1241,5 +1286,55 @@
     "toast_logo_updated": "ワークスペースのロゴを更新しました",
     "toast_save_failed": "ワークスペース設定を保存できませんでした",
     "toast_saved": "ワークスペース設定を保存しました"
+  },
+  "issue_statuses": {
+    "title": "イシューステータス",
+    "description": "組み込みの 7 つのステータスに加えて独自のステータスを追加できます。各ステータスはカテゴリに属し、カテゴリが挙動を決めます。",
+    "loading": "ステータスを読み込み中…",
+    "add": "ステータスを追加",
+    "show_archived": "アーカイブ済みを表示（{{count}}）",
+    "archived_badge": "アーカイブ済み",
+    "archived_hint": "新規の割り当てには使えません。すでにこのステータスのイシューはそのままです。",
+    "built_in_locked": "組み込みステータス。名前・色・カテゴリは変更できません。",
+    "flag_off": "このデプロイではカスタムステータスがまだ有効化されていません。下の組み込みステータスは通常どおり使えます。",
+    "reorder_failed": "並び順を保存できませんでした。",
+    "actions": {
+      "open": "{{name}} の操作",
+      "edit": "編集",
+      "archive": "アーカイブ",
+      "reorder": "{{name}} を並べ替え"
+    },
+    "editor": {
+      "create_title": "新しいステータス",
+      "edit_title": "ステータスを編集",
+      "behavior_hint": "このステータスは「{{category}}」とまったく同じ挙動になります。",
+      "name": "名前",
+      "name_placeholder": "例: Code Review",
+      "category": "カテゴリ",
+      "category_locked": "カテゴリは変更できません。すでにこのステータスのイシューが依存しています。",
+      "description": "説明",
+      "description_placeholder": "チームにとってこのステータスが意味すること",
+      "color": "色",
+      "cancel": "キャンセル",
+      "save": "保存",
+      "saving": "保存中…",
+      "save_failed": "ステータスを保存できませんでした。"
+    },
+    "archive_dialog": {
+      "title": "このステータスをアーカイブしますか？",
+      "description": "「{{name}}」は新しいイシューに割り当てられなくなります。すでにこのステータスのイシューはそのまま残り、挙動も変わりません。",
+      "cancel": "キャンセル",
+      "confirm": "アーカイブ",
+      "failed": "アーカイブできませんでした。"
+    },
+    "categories": {
+      "backlog": "保留。ここに移動してもエージェントは起動しません。",
+      "todo": "待機中。ここに移動すると担当エージェントが起動します。",
+      "in_progress": "作業中。",
+      "in_review": "納品済み、レビュー待ち。オートパイロットの実行を完了します。",
+      "done": "完了。",
+      "blocked": "外部依存でブロック中。",
+      "cancelled": "見送り。"
+    }
   }
 }

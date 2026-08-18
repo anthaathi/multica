@@ -135,7 +135,8 @@
     "revoked_badge": "已撤销",
     "section_title": "钉钉",
     "toast_disconnect_failed": "断开失败",
-    "toast_disconnected": "已断开钉钉机器人"
+    "toast_disconnected": "已断开钉钉机器人",
+    "identity_label": "钉钉绑定身份：{{identity}}"
   },
   "github": {
     "connect_disabled_tooltip": "服务端未配置 GitHub App",
@@ -578,7 +579,8 @@
       "quick_actions": "快捷操作",
       "repositories": "代码仓库",
       "shortcuts": "快捷键",
-      "tokens": "API Token"
+      "tokens": "API Token",
+      "issue_statuses": "议题状态"
     },
     "title": "设置",
     "workspace_fallback": "工作区"
@@ -603,7 +605,12 @@
     "health": "健康状态：",
     "incompatible": "Release 不兼容",
     "incompatible_description": "此 release 需要更新的 Host API 或守护进程能力，无法激活。",
-    "install": "安装",
+    "install": {
+      "title": "安装 Plugin",
+      "description": "粘贴 Plugin manifest 的 URL。安装前你会先看到它请求的全部权限。",
+      "placeholder": "https://example.com/multica.plugin.json",
+      "review": "查看权限"
+    },
     "install_disabled_hint": "安装后默认停用。安装完成后再选择工作区或智能体作用范围。",
     "installed_disabled": "Plugin 已安装并保持停用",
     "load_failed": "无法加载 Plugins",
@@ -705,7 +712,45 @@
     "upgrade_to": "升级到 v{{version}}",
     "upgraded": "Plugin 已升级",
     "uploaded_by": "上传者",
-    "workspace_scope": "工作区"
+    "workspace_scope": "工作区",
+    "enabled_label": "启用 Plugin",
+    "granted_scopes": "已授予的访问权限",
+    "contributes": "提供的能力",
+    "version": "v{{version}}",
+    "byline": "{{author}} · v{{version}}",
+    "installed": {
+      "title": "已安装"
+    },
+    "consent": {
+      "title": "该 Plugin 请求以下访问权限",
+      "description": "Multica 从不在服务器上运行 Plugin 代码。Plugin 只能做这些权限允许的事，且永远不会超过使用者本人的权限。",
+      "cancel": "取消",
+      "confirm": "授权并安装",
+      "confirm_upgrade": "授权并升级",
+      "installed": "Plugin 已安装",
+      "upgrade_from": " · 从 v{{version}} 升级",
+      "new_scope": "新增"
+    },
+    "config": {
+      "title": "配置",
+      "save": "保存",
+      "saved": "配置已保存",
+      "secret_set": "已保存 — 输入新值可替换"
+    },
+    "scopes": {
+      "issues_read": "读取 issue",
+      "issues_write": "创建和修改 issue",
+      "comments_read": "读取评论",
+      "comments_write": "发表评论",
+      "tasks_read": "读取 agent task",
+      "tasks_write": "启动和更新 agent task",
+      "agents_read": "读取 agent 列表",
+      "members_read": "读取成员列表",
+      "storage_user": "为每位成员单独存储数据",
+      "storage_workspace": "存储工作区共享数据",
+      "net": "向 {{domain}} 发送数据",
+      "unknown": "无法识别的权限 — 请勿安装"
+    }
   },
   "preferences": {
     "general_title": "常规",
@@ -1241,5 +1286,55 @@
     "toast_logo_updated": "工作区图标已更新",
     "toast_save_failed": "保存工作区设置失败",
     "toast_saved": "已保存工作区设置"
+  },
+  "issue_statuses": {
+    "title": "议题状态",
+    "description": "在内置的 7 个状态之外添加自己的状态。每个状态都属于一个分类，分类决定了它的行为。",
+    "loading": "正在加载状态…",
+    "add": "添加状态",
+    "show_archived": "显示已归档（{{count}}）",
+    "archived_badge": "已归档",
+    "archived_hint": "已停止用于新的指派，已经在该状态上的议题保持不变。",
+    "built_in_locked": "内置状态，名称、颜色和分类均不可修改。",
+    "flag_off": "当前部署尚未开启自定义状态，下面的内置状态照常使用。",
+    "reorder_failed": "排序保存失败。",
+    "actions": {
+      "open": "{{name}} 的操作",
+      "edit": "编辑",
+      "archive": "归档",
+      "reorder": "拖动排序 {{name}}"
+    },
+    "editor": {
+      "create_title": "新建状态",
+      "edit_title": "编辑状态",
+      "behavior_hint": "该状态的行为与「{{category}}」完全一致。",
+      "name": "名称",
+      "name_placeholder": "例如：Code Review",
+      "category": "分类",
+      "category_locked": "分类不可修改 —— 已经处于该状态的议题依赖它。",
+      "description": "描述",
+      "description_placeholder": "这个状态对团队意味着什么",
+      "color": "颜色",
+      "cancel": "取消",
+      "save": "保存",
+      "saving": "保存中…",
+      "save_failed": "状态保存失败。"
+    },
+    "archive_dialog": {
+      "title": "归档这个状态？",
+      "description": "「{{name}}」将不再能被指派给新的议题。已经处于该状态的议题保持不变，行为也完全不变。",
+      "cancel": "取消",
+      "confirm": "归档",
+      "failed": "归档失败。"
+    },
+    "categories": {
+      "backlog": "搁置。把议题移到这里不会启动 agent。",
+      "todo": "排队中。把议题移到这里会启动指派的 agent。",
+      "in_progress": "正在进行。",
+      "in_review": "已交付，等待人工 review。会结束 autopilot 运行。",
+      "done": "已完成。",
+      "blocked": "被外部依赖阻塞。",
+      "cancelled": "决定不做。"
+    }
   }
 }

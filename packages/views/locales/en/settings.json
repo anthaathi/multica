@@ -135,7 +135,8 @@
     "revoked_badge": "revoked",
     "section_title": "DingTalk",
     "toast_disconnect_failed": "Disconnect failed",
-    "toast_disconnected": "Disconnected DingTalk bot"
+    "toast_disconnected": "Disconnected DingTalk bot",
+    "identity_label": "Linked DingTalk identity: {{identity}}"
   },
   "github": {
     "connect_disabled_tooltip": "GitHub App is not configured on this server",
@@ -578,7 +579,8 @@
       "quick_actions": "Quick Actions",
       "repositories": "Repositories",
       "shortcuts": "Shortcuts",
-      "tokens": "API Tokens"
+      "tokens": "API Tokens",
+      "issue_statuses": "Issue Statuses"
     },
     "title": "Settings",
     "workspace_fallback": "Workspace"
@@ -603,7 +605,12 @@
     "health": "Health:",
     "incompatible": "Incompatible release",
     "incompatible_description": "This release requires a newer host API or daemon capability and cannot be activated.",
-    "install": "Install",
+    "install": {
+      "title": "Install a Plugin",
+      "description": "Paste the URL of a plugin manifest. You'll see what it asks for before anything is installed.",
+      "placeholder": "https://example.com/multica.plugin.json",
+      "review": "Review"
+    },
     "install_disabled_hint": "Installation is disabled by default. Choose a workspace or agent scope after installing.",
     "installed_disabled": "Plugin installed and left disabled",
     "load_failed": "Plugins couldn't be loaded",
@@ -705,7 +712,45 @@
     "upgrade_to": "Upgrade to v{{version}}",
     "upgraded": "Plugin upgraded",
     "uploaded_by": "Uploaded by",
-    "workspace_scope": "Workspace"
+    "workspace_scope": "Workspace",
+    "enabled_label": "Enable Plugin",
+    "granted_scopes": "Granted access",
+    "contributes": "Contributes",
+    "version": "v{{version}}",
+    "byline": "{{author}} · v{{version}}",
+    "installed": {
+      "title": "Installed"
+    },
+    "consent": {
+      "title": "This Plugin is asking for the following access",
+      "description": "Multica never runs plugin code on its servers. A Plugin can only do what these scopes allow, and never more than the person using it can already do.",
+      "cancel": "Cancel",
+      "confirm": "Grant and install",
+      "confirm_upgrade": "Grant and upgrade",
+      "installed": "Plugin installed",
+      "upgrade_from": " · upgrading from v{{version}}",
+      "new_scope": "New"
+    },
+    "config": {
+      "title": "Configuration",
+      "save": "Save",
+      "saved": "Configuration saved",
+      "secret_set": "Saved — enter a new value to replace it"
+    },
+    "scopes": {
+      "issues_read": "Read issues",
+      "issues_write": "Create and edit issues",
+      "comments_read": "Read comments",
+      "comments_write": "Post comments",
+      "tasks_read": "Read agent tasks",
+      "tasks_write": "Start and update agent tasks",
+      "agents_read": "Read the agent list",
+      "members_read": "Read the member list",
+      "storage_user": "Store data for each member individually",
+      "storage_workspace": "Store data shared by the workspace",
+      "net": "Send data to {{domain}}",
+      "unknown": "Unrecognized access — do not install"
+    }
   },
   "preferences": {
     "general_title": "General",
@@ -1242,5 +1287,55 @@
     "toast_logo_updated": "Workspace logo updated",
     "toast_save_failed": "Failed to save workspace settings",
     "toast_saved": "Workspace settings saved"
+  },
+  "issue_statuses": {
+    "title": "Issue Statuses",
+    "description": "Add statuses of your own on top of the seven built-in ones. Every status belongs to a category, and the category is what determines its behavior.",
+    "loading": "Loading statuses…",
+    "add": "Add status",
+    "show_archived": "Show archived ({{count}})",
+    "archived_badge": "Archived",
+    "archived_hint": "Retired from new assignments. Issues already on it keep it.",
+    "built_in_locked": "Built-in status. Name, color and category are fixed.",
+    "flag_off": "Custom statuses are not enabled for this deployment yet. The built-in statuses below work as usual.",
+    "reorder_failed": "Could not save the new order.",
+    "actions": {
+      "open": "Actions for {{name}}",
+      "edit": "Edit",
+      "archive": "Archive",
+      "reorder": "Reorder {{name}}"
+    },
+    "editor": {
+      "create_title": "New status",
+      "edit_title": "Edit status",
+      "behavior_hint": "This status behaves exactly like {{category}}.",
+      "name": "Name",
+      "name_placeholder": "e.g. Code Review",
+      "category": "Category",
+      "category_locked": "Category cannot be changed — issues already on this status depend on it.",
+      "description": "Description",
+      "description_placeholder": "What this status means for your team",
+      "color": "Color",
+      "cancel": "Cancel",
+      "save": "Save",
+      "saving": "Saving…",
+      "save_failed": "Could not save the status."
+    },
+    "archive_dialog": {
+      "title": "Archive this status?",
+      "description": "\"{{name}}\" stops being available for new issues. Issues already on it keep it and keep behaving exactly as they do now.",
+      "cancel": "Cancel",
+      "confirm": "Archive",
+      "failed": "Could not archive the status."
+    },
+    "categories": {
+      "backlog": "Parked. Assigning an issue here never starts an agent run.",
+      "todo": "Queued. Moving an issue here starts the assigned agent.",
+      "in_progress": "Actively being worked on.",
+      "in_review": "Delivered, waiting on human review. Finalizes the autopilot run.",
+      "done": "Completed.",
+      "blocked": "Stalled on an external dependency.",
+      "cancelled": "Decided not to do."
+    }
   }
 }

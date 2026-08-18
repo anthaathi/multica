@@ -5216,6 +5216,15 @@ func taskRunFailureReason(err error) string {
 	if errors.Is(err, errSkillBundleUnavailable) {
 		return taskfailure.ReasonSkillBundleUnavailable.String()
 	}
+	// Structural, not textual: the message ends in "context deadline exceeded",
+	// which Classify routes to agent_error.provider_network — "the connection to
+	// the model provider dropped, check your network" for a stall that is purely
+	// local, plus an auto-retry of a failure that is deterministic on the host.
+	// The sentinel survives the preparation helper boundary via
+	// preparationErrorKind (#7112).
+	if errors.Is(err, execenv.ErrOpenclawCLITimeout) {
+		return taskfailure.ReasonRuntimeCLITimeout.String()
+	}
 	return taskfailure.Classify(err.Error()).String()
 }
 
@@ -5571,6 +5580,7 @@ var runtimeDisplayNameOverrides = map[string]string{
 	"qoderclicn": "Qoder CN",
 	"qwen":       "Qwen Code",
 	"qwenpaw":    "QwenPaw",
+	"mcode":      "MiniMax Code",
 }
 
 func init() {
@@ -5608,7 +5618,8 @@ func providerDisplayName(name string) string {
 // probed each one over its real launch path with a canary in the context file
 // and no inline delivery: claude 2.1.220 (CLAUDE.md), codex 0.144.6 driving the
 // app-server (AGENTS.md), opencode 1.17.7 (AGENTS.md), pi 0.67.2 (AGENTS.md),
-// hermes 0.18.2 over ACP (AGENTS.md). kiro was confirmed earlier by a kiro-cli
+// hermes 0.18.2 over ACP (AGENTS.md). MCode 0.1.2 also loads AGENTS.md by its
+// native runtime contract. kiro was confirmed earlier by a kiro-cli
 // 2.13.0 ACP smoke — see the call site. Still unprobed: grok, qoder, codebuddy.
 func providerNeedsInlineSystemPrompt(provider string) bool {
 	switch provider {
