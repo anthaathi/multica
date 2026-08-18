@@ -92,9 +92,11 @@ func (b *ompBackend) Execute(ctx context.Context, prompt string, opts ExecOption
 	runCtx, cancel := runContext(ctx, timeout)
 
 	args := buildOmpArgs(prompt, sessionDir, opts, b.cfg.Logger)
-	argv0, cmdArgs := chooseOmpInvocation(execName, lookedUp, args, b.cfg.Logger)
-
-	cmd := exec.CommandContext(runCtx, argv0, cmdArgs...)
+	// Route the spawn through Command.execVia so a custom runtime profile's
+	// fixed_args (LaunchPrefix) is spliced into the CLI's argv — spawning via
+	// exec.CommandContext directly would drop it (GH #7046;
+	// TestOnlyLaunchGoSpawnsRuntimeProcesses enforces this package-wide).
+	cmd, argv0, cmdArgs := b.cfg.commandAt(execName).execVia(runCtx, chooseOmpInvocation, lookedUp, args, b.cfg.Logger)
 	hideAgentWindow(cmd)
 	b.cfg.Logger.Info("agent command", "exec", argv0, "args", cmdArgs)
 	cmd.WaitDelay = 10 * time.Second

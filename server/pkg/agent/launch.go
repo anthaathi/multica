@@ -163,6 +163,11 @@ var launchPrefixBlockedArgs = map[string]map[string]blockedArgMode{
 	"opencode":    opencodeBlockedArgs,
 	"openclaw":    openclawBlockedArgs,
 	"pi":          piBlockedArgs,
+	// omp is a pi-family runtime identity with a dedicated backend (see
+	// NewRuntime): New() sees "omp", not "pi", so it must carry its own entry
+	// or the launch prefix would bypass protocol-flag filtering entirely.
+	// ompBlockedArgs is piBlockedArgs plus omp's --resume/-r/--session aliases.
+	"omp":         ompBlockedArgs,
 	"qoder":       qoderBlockedArgs,
 	"qoderclicn":  qoderBlockedArgs,
 	"qwen":        qwenBlockedArgs,

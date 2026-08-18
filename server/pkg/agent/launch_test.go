@@ -323,6 +323,9 @@ func TestLaunchPrefixOutranksExtraArgs(t *testing.T) {
 
 // TestBuiltinRuntimeIdentitiesFilterLaunchPrefix: NewRuntime composes New, so
 // a runtime identity (omp) inherits the same prefix policy as its family.
+// Fork adaptation: omp ships a dedicated ompBackend (upstream routes it
+// through piBackend instead), so assert on ompBackend — the filtering itself
+// happens in New() before the backend switch and is identical.
 func TestBuiltinRuntimeIdentitiesFilterLaunchPrefix(t *testing.T) {
 	t.Parallel()
 
@@ -334,7 +337,7 @@ func TestBuiltinRuntimeIdentitiesFilterLaunchPrefix(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveBackend(omp): %v", err)
 	}
-	got := backend.(*piBackend).cfg.LaunchPrefix
+	got := backend.(*ompBackend).cfg.LaunchPrefix
 	if strings.Join(got, "\x00") != "start\x00q36" {
 		t.Fatalf("runtime identity did not inherit prefix filtering: %v", got)
 	}
