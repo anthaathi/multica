@@ -176,6 +176,7 @@ func NewRuntime(runtimeID string, cfg Config) (Backend, error) {
 	if _, ok := BuiltinRuntimeByID(runtimeID); !ok {
 		return nil, fmt.Errorf("unknown runtime identity: %q", runtimeID)
 	}
+	cfg.provider = runtimeID
 	// Prefer a dedicated backend (e.g. omp's ompBackend) over the generic
 	// family+override path.
 	if backend, err := New(runtimeID, cfg); err == nil {

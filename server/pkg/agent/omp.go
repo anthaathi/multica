@@ -96,9 +96,12 @@ func (b *ompBackend) Execute(ctx context.Context, prompt string, opts ExecOption
 	// fixed_args (LaunchPrefix) is spliced into the CLI's argv — spawning via
 	// exec.CommandContext directly would drop it (GH #7046;
 	// TestOnlyLaunchGoSpawnsRuntimeProcesses enforces this package-wide).
-	cmd, argv0, cmdArgs := b.cfg.commandAt(execName).execVia(runCtx, chooseOmpInvocation, lookedUp, args, b.cfg.Logger)
+	cmd, _, _ := b.cfg.commandAt(execName).execVia(runCtx, chooseOmpInvocation, lookedUp, args, b.cfg.Logger)
 	hideAgentWindow(cmd)
-	b.cfg.Logger.Info("agent command", "exec", argv0, "args", cmdArgs)
+	// Route the argv log through Config.logAgentCommand so values are
+	// redacted; a direct Logger.Info("agent command", ...) is rejected by
+	// TestOnlyLaunchGoLogsAgentCommandArgs package-wide.
+	b.cfg.logAgentCommand(cmd, newAgentCommandLogArgs(args))
 	cmd.WaitDelay = 10 * time.Second
 	if opts.Cwd != "" {
 		cmd.Dir = opts.Cwd

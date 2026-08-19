@@ -62,6 +62,9 @@ const slackListingRef = vi.hoisted(() => ({
 const mattermostListingRef = vi.hoisted(() => ({
   current: { installations: [] as unknown[], configured: false },
 }));
+const telegramListingRef = vi.hoisted(() => ({
+  current: { installations: [] as unknown[], configured: false },
+}));
 vi.mock("@multica/core/hooks", () => ({
   useWorkspaceId: () => "ws-1",
 }));
@@ -81,6 +84,12 @@ vi.mock("@multica/core/mattermost", () => ({
   mattermostInstallationsOptions: () => ({
     queryKey: ["mattermost", "installations"],
     queryFn: () => Promise.resolve(mattermostListingRef.current),
+  }),
+}));
+vi.mock("@multica/core/telegram", () => ({
+  telegramInstallationsOptions: () => ({
+    queryKey: ["telegram", "installations"],
+    queryFn: () => Promise.resolve(telegramListingRef.current),
   }),
 }));
 
@@ -177,6 +186,7 @@ beforeEach(() => {
   larkListingRef.current = { installations: [], configured: false };
   slackListingRef.current = { installations: [], configured: false };
   mattermostListingRef.current = { installations: [], configured: false };
+  telegramListingRef.current = { installations: [], configured: false };
 });
 
 describe("AgentOverviewPane MCP tab visibility", () => {
@@ -249,9 +259,18 @@ describe("AgentOverviewPane Integrations tab visibility", () => {
     ).toBeInTheDocument();
   });
 
-  it("hides the Integrations tab when neither Lark nor Slack is configured", () => {
-    // Default refs are configured:false; the tab must not appear on
-    // deployments without either integration, the common case.
+  it("shows the Integrations tab when only Telegram is configured", async () => {
+    telegramListingRef.current = { installations: [], configured: true };
+    renderPane([makeRuntime("claude")]);
+    openCapabilities();
+    expect(
+      await screen.findByRole("tab", { name: /^Integrations$/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("hides the Integrations tab when no channel integration is configured", () => {
+    // Default refs are configured:false; the tab must not appear on a
+    // deployment without any channel integration, the common case.
     renderPane([makeRuntime("claude")]);
     openCapabilities();
     expect(

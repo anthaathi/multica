@@ -16,6 +16,7 @@ import { slackInstallationsOptions } from "@multica/core/slack";
 import { mattermostInstallationsOptions } from "@multica/core/mattermost";
 import { dingtalkInstallationsOptions } from "@multica/core/dingtalk";
 import { wecomInstallationsOptions } from "@multica/core/wecom";
+import { telegramInstallationsOptions } from "@multica/core/telegram";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -185,13 +186,18 @@ export function AgentOverviewPane({
     ...wecomInstallationsOptions(wsId),
     enabled: !!wsId,
   });
+  const { data: telegramListing } = useQuery({
+    ...telegramInstallationsOptions(wsId),
+    enabled: !!wsId,
+  });
 
   const integrationsConfigured =
     larkListing?.configured === true ||
     slackListing?.configured === true ||
     mattermostListing?.configured === true ||
     dingtalkListing?.configured === true ||
-    wecomListing?.configured === true;
+    wecomListing?.configured === true ||
+    telegramListing?.configured === true;
 
   const visibleCapabilityTabs = useMemo(() => {
     const showMcp = runtime

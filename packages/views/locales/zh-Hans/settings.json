@@ -750,6 +750,18 @@
       "storage_workspace": "存储工作区共享数据",
       "net": "向 {{domain}} 发送数据",
       "unknown": "无法识别的权限 — 请勿安装"
+    },
+    "hook_circuit_open": "连续失败后已停止投递该 hook。",
+    "hook_recent_failures": "最近有 {{count}} 次 hook 调用失败。",
+    "mcp": {
+      "badge": "MCP",
+      "description": "该 hook 采用插件作者自己的 MCP server 提供的工具。勾选允许 agent 调用的工具——之后新出现的工具不会自动生效，需要你再次批准。",
+      "loading": "正在加载工具",
+      "unreachable": "无法连接插件的 MCP server。",
+      "empty": "该 MCP server 当前没有提供任何工具。",
+      "drifted": "schema 已变更",
+      "save": "保存批准",
+      "approved": "已更新批准的工具。"
     }
   },
   "preferences": {
@@ -1318,7 +1330,8 @@
       "cancel": "取消",
       "save": "保存",
       "saving": "保存中…",
-      "save_failed": "状态保存失败。"
+      "save_failed": "状态保存失败。",
+      "key_hint": "API 和 CLI 中通过 {{key}} 引用。"
     },
     "archive_dialog": {
       "title": "归档这个状态？",
@@ -1336,5 +1349,46 @@
       "blocked": "被外部依赖阻塞。",
       "cancelled": "决定不做。"
     }
+  },
+  "telegram": {
+    "section_title": "Telegram",
+    "page_description": "将每个 Multica 智能体连接到专属的 Telegram 机器人。成员可私聊机器人、在群里 @ 它、输入 /issue 创建 Multica 任务，并实时看到智能体的流式回复。",
+    "not_enabled_title": "Telegram 集成未启用",
+    "not_enabled_description_prefix": "在服务器上设置",
+    "not_enabled_description_suffix": "以启用 Telegram 机器人安装。",
+    "not_enabled_self_host_hint": "自部署用户：详见项目 README。",
+    "preview_title": "Telegram 安装即将上线",
+    "preview_description": "静态加密密钥已设置，但本部署暂未开放安装。开放后，连接按钮会出现在这里。",
+    "connected_bots": "已连接的机器人",
+    "loading": "加载中…",
+    "load_failed": "加载 Telegram 安装失败",
+    "empty_title": "尚未连接机器人",
+    "empty_description_prefix": "在本工作区打开一个智能体，点击",
+    "empty_description_cta": "连接 Telegram",
+    "empty_description_suffix": "为其安装机器人。",
+    "revoked_badge": "已撤销",
+    "installed_at_label": "安装于 {{when}}",
+    "disconnect": "断开连接",
+    "disconnecting": "正在断开…",
+    "disconnect_confirm_title": "断开此 Telegram 机器人？",
+    "disconnect_confirm_description": "机器人将停止接收本工作区的 Telegram 消息。Multica 中的会话记录会保留；之后可在同一智能体上重新连接。",
+    "disconnect_confirm_cancel": "取消",
+    "toast_disconnected": "已断开 Telegram 机器人",
+    "toast_disconnect_failed": "断开失败",
+    "bind_button": "连接 Telegram",
+    "bind_button_title": "将 {{agent}} 连接到 Telegram 机器人",
+    "agent_bot_connected_label": "已连接 Telegram",
+    "agent_bot_disconnect_tooltip": "解除该智能体与 Telegram 机器人的绑定，机器人将停止接收 Telegram 消息。",
+    "agent_bot_manage_link": "在 Telegram 中打开",
+    "agent_bot_manage_tooltip": "在 Telegram 中打开与该机器人的对话。",
+    "connect_dialog_title": "连接 Telegram 机器人",
+    "connect_dialog_description": "在 Telegram 中通过 @BotFather 创建机器人，然后在下方粘贴它的 token。token 会实时校验并加密存储。",
+    "connect_docs_link": "分步指南：将 Multica 智能体连接到 Telegram",
+    "bot_token_label": "机器人 token",
+    "connect_submit": "连接",
+    "connect_submitting": "正在连接…",
+    "connect_cancel": "取消",
+    "connect_success_toast": "已连接 Telegram 机器人",
+    "connect_failed_toast": "连接 Telegram 机器人失败"
   }
 }

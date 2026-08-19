@@ -3618,7 +3618,9 @@ func (s *TaskService) MarkTaskWaitingLocalDirectory(ctx context.Context, taskID 
 // queued chat message could be claimed in the window between the task
 // flipping to 'completed' and chat_session.session_id being refreshed,
 // causing the new task to resume against a stale (or NULL) session.
-func (s *TaskService) CompleteTask(ctx context.Context, taskID pgtype.UUID, result []byte, sessionID, workDir, branchName string, sessionRolloutMissing bool, retiredSessionID string) (*db.AgentTaskQueue, error) {
+// durableWorkDir is terminal delivery metadata, not a resume pointer: it is
+// populated only after the daemon confirms a disposable worktree is gone.
+func (s *TaskService) CompleteTask(ctx context.Context, taskID pgtype.UUID, result []byte, sessionID, workDir, branchName string, sessionRolloutMissing bool, retiredSessionID, durableWorkDir string) (*db.AgentTaskQueue, error) {
 	var task db.AgentTaskQueue
 	// chatAssistantMsg is the single assistant outcome row written for a chat
 	// task inside the completion transaction below. It is broadcast (chat:done)
@@ -3633,6 +3635,7 @@ func (s *TaskService) CompleteTask(ctx context.Context, taskID pgtype.UUID, resu
 			Result:                result,
 			SessionID:             pgtype.Text{String: sessionID, Valid: sessionID != ""},
 			WorkDir:               pgtype.Text{String: workDir, Valid: workDir != ""},
+			DurableWorkDir:        pgtype.Text{String: durableWorkDir, Valid: durableWorkDir != ""},
 			BranchName:            pgtype.Text{String: branchName, Valid: branchName != ""},
 			SessionRolloutMissing: sessionRolloutMissing,
 			RetiredSessionID:      pgtype.Text{String: retiredSessionID, Valid: retiredSessionID != ""},
@@ -4015,6 +4018,8 @@ func (s *TaskService) observeChatOutputLocalPath(task db.AgentTaskQueue, body st
 // tool error), the daemon should pass them so we can preserve the resume
 // pointer on both the task row and the chat_session — otherwise the next
 // chat turn would silently start a brand-new session and lose memory.
+// durableWorkDir is persisted on the task only; it never replaces the actual
+// workDir used for session resumption.
 //
 // failureReason is a coarse classifier consumed by the auto-retry path.
 // Pass "" when unknown — the server runs the raw error text through
@@ -4023,7 +4028,7 @@ func (s *TaskService) observeChatOutputLocalPath(task db.AgentTaskQueue, body st
 // coarse bucket. Daemon callers that already produced a refined reason
 // (via classifyPoisonedError, the timeout / runtime classifier, etc.)
 // will have their value preserved untouched.
-func (s *TaskService) FailTask(ctx context.Context, taskID pgtype.UUID, errMsg, sessionID, workDir, branchName, failureReason string, sessionRolloutMissing bool, retiredSessionID string) (*db.AgentTaskQueue, error) {
+func (s *TaskService) FailTask(ctx context.Context, taskID pgtype.UUID, errMsg, sessionID, workDir, branchName, failureReason string, sessionRolloutMissing bool, retiredSessionID, durableWorkDir string) (*db.AgentTaskQueue, error) {
 	// Strip bytes PostgreSQL cannot store before anything else reads errMsg, so
 	// the classifier, the transaction and every downstream consumer see the one
 	// text we will actually persist (GH #7098). Kept at the service boundary
@@ -4099,11 +4104,12 @@ func (s *TaskService) FailTask(ctx context.Context, taskID pgtype.UUID, errMsg, 
 			return err
 		}
 		t, err := qtx.FailAgentTask(ctx, db.FailAgentTaskParams{
-			ID:            taskID,
-			Error:         pgtype.Text{String: errMsg, Valid: true},
-			FailureReason: pgtype.Text{String: failureReason, Valid: failureReason != ""},
-			SessionID:     pgtype.Text{String: sessionID, Valid: sessionID != ""},
-			WorkDir:       pgtype.Text{String: workDir, Valid: workDir != ""},
+			ID:             taskID,
+			Error:          pgtype.Text{String: errMsg, Valid: true},
+			FailureReason:  pgtype.Text{String: failureReason, Valid: failureReason != ""},
+			SessionID:      pgtype.Text{String: sessionID, Valid: sessionID != ""},
+			WorkDir:        pgtype.Text{String: workDir, Valid: workDir != ""},
+			DurableWorkDir: pgtype.Text{String: durableWorkDir, Valid: durableWorkDir != ""},
 			// A failed run can still have produced a branch: worktree mode
 			// commits whatever the agent left before tearing the worktree down,
 			// precisely so partial work survives. Dropping the name here would
@@ -5069,7 +5075,7 @@ func (s *TaskService) ensureDelegatedFailureRecoveryComment(ctx context.Context,
 		if !errors.Is(err, pgx.ErrNoRows) {
 			return fmt.Errorf("find recovery comment: %w", err)
 		}
-		comment, err = qtx.CreateComment(ctx, db.CreateCommentParams{
+		createdComment, err := qtx.CreateComment(ctx, db.CreateCommentParams{
 			IssueID:      target.issue.ID,
 			WorkspaceID:  target.issue.WorkspaceID,
 			AuthorType:   "system",
@@ -5081,7 +5087,7 @@ func (s *TaskService) ensureDelegatedFailureRecoveryComment(ctx context.Context,
 		if err != nil {
 			return fmt.Errorf("create recovery comment: %w", err)
 		}
-		target.comment = comment
+		target.comment = createdComment.Comment()
 		created = true
 		return nil
 	}); err != nil {
@@ -5174,7 +5180,7 @@ func (s *TaskService) exhaustDelegatedFailureRecovery(ctx context.Context, targe
 			return fmt.Errorf("find delegated failure exhaustion comment: %w", err)
 		}
 
-		comment, err = qtx.CreateComment(ctx, db.CreateCommentParams{
+		createdComment, err := qtx.CreateComment(ctx, db.CreateCommentParams{
 			IssueID:      target.issue.ID,
 			WorkspaceID:  target.issue.WorkspaceID,
 			AuthorType:   "system",
@@ -5186,7 +5192,7 @@ func (s *TaskService) exhaustDelegatedFailureRecovery(ctx context.Context, targe
 		if err != nil {
 			return fmt.Errorf("create delegated failure exhaustion comment: %w", err)
 		}
-		exhaustedComment = comment
+		exhaustedComment = createdComment.Comment()
 		created = true
 
 		// Exhaustion deliberately does not @mention the coordinator agent: doing
@@ -6015,7 +6021,7 @@ func (s *TaskService) createAgentComment(ctx context.Context, issueID, agentID p
 			rootComment = &root
 		}
 	}
-	comment, err := s.Queries.CreateComment(ctx, db.CreateCommentParams{
+	created, err := s.Queries.CreateComment(ctx, db.CreateCommentParams{
 		IssueID:      issueID,
 		WorkspaceID:  issue.WorkspaceID,
 		AuthorType:   "agent",
@@ -6028,6 +6034,7 @@ func (s *TaskService) createAgentComment(ctx context.Context, issueID, agentID p
 	if err != nil {
 		return
 	}
+	comment := created.Comment()
 	s.CancelDeferredEscalationsForIssueAgent(ctx, issueID, agentID)
 	s.Bus.Publish(events.Event{
 		Type:        protocol.EventCommentCreated,
@@ -6045,9 +6052,11 @@ func (s *TaskService) createAgentComment(ctx context.Context, issueID, agentID p
 				"parent_id":      util.UUIDToPtr(comment.ParentID),
 				"source_task_id": util.UUIDToPtr(comment.SourceTaskID),
 				"created_at":     comment.CreatedAt.Time.Format("2006-01-02T15:04:05Z"),
+				"revision":       comment.Revision,
 			},
-			"issue_title":  issue.Title,
-			"issue_status": issue.Status,
+			"issue_title":    issue.Title,
+			"issue_status":   issue.Status,
+			"issue_revision": created.IssueRevision,
 		},
 	})
 	s.AutoUnresolveThreadOnReply(ctx, rootComment, util.UUIDToString(issue.WorkspaceID), "agent", util.UUIDToString(agentID))
@@ -6087,6 +6096,7 @@ func (s *TaskService) AutoUnresolveThreadOnReply(ctx context.Context, parent *db
 				"resolved_at":      util.TimestampToPtr(updated.ResolvedAt),
 				"resolved_by_type": util.TextToPtr(updated.ResolvedByType),
 				"resolved_by_id":   util.UUIDToPtr(updated.ResolvedByID),
+				"revision":         updated.Revision,
 			},
 		},
 	})
@@ -6138,22 +6148,24 @@ func IssueToMap(issue db.Issue, issuePrefix string) map[string]any {
 		// Mirrors handler.IssueResponse.StatusCategory: a built-in status IS
 		// its own category, so this resolves with no catalog lookup. Empty for
 		// a custom status, which consumers resolve via the catalog. (MUL-6243)
-		"status_category": builtInStatusCategory(issue.Status),
-		"priority":        issue.Priority,
-		"assignee_type":   util.TextToPtr(issue.AssigneeType),
-		"assignee_id":     util.UUIDToPtr(issue.AssigneeID),
-		"creator_type":    issue.CreatorType,
-		"creator_id":      util.UUIDToString(issue.CreatorID),
-		"parent_issue_id": util.UUIDToPtr(issue.ParentIssueID),
-		"project_id":      util.UUIDToPtr(issue.ProjectID),
-		"position":        issue.Position,
-		"stage":           util.Int4ToPtr(issue.Stage),
-		"start_date":      util.DateToPtr(issue.StartDate),
-		"due_date":        util.DateToPtr(issue.DueDate),
-		"created_at":      util.TimestampToString(issue.CreatedAt),
-		"updated_at":      util.TimestampToString(issue.UpdatedAt),
-		"metadata":        util.JSONObjectOrEmpty(issue.Metadata),
-		"properties":      util.JSONObjectOrEmpty(issue.Properties),
+		"status_category":  builtInStatusCategory(issue.Status),
+		"priority":         issue.Priority,
+		"assignee_type":    util.TextToPtr(issue.AssigneeType),
+		"assignee_id":      util.UUIDToPtr(issue.AssigneeID),
+		"creator_type":     issue.CreatorType,
+		"creator_id":       util.UUIDToString(issue.CreatorID),
+		"parent_issue_id":  util.UUIDToPtr(issue.ParentIssueID),
+		"project_id":       util.UUIDToPtr(issue.ProjectID),
+		"position":         issue.Position,
+		"stage":            util.Int4ToPtr(issue.Stage),
+		"start_date":       util.DateToPtr(issue.StartDate),
+		"due_date":         util.DateToPtr(issue.DueDate),
+		"created_at":       util.TimestampToString(issue.CreatedAt),
+		"updated_at":       util.TimestampToString(issue.UpdatedAt),
+		"last_activity_at": util.TimestampToNanoPtr(issue.LastActivityAt),
+		"revision":         issue.Revision,
+		"metadata":         util.JSONObjectOrEmpty(issue.Metadata),
+		"properties":       util.JSONObjectOrEmpty(issue.Properties),
 	}
 }
 

@@ -354,7 +354,9 @@
     "link_copy_failed": "リンクをコピーできませんでした",
     "workdir_path_copied": "作業ディレクトリのパスをコピーしました",
     "workdir_path_copy_failed": "作業ディレクトリのパスをコピーできませんでした",
-    "workdir_path_unavailable": "まだローカルの作業ディレクトリがありません。ローカルエージェントがこのタスクを実行していません"
+    "workdir_path_unavailable": "まだローカルの作業ディレクトリがありません。ローカルエージェントがこのタスクを実行していません",
+    "project_directory_path_copied": "プロジェクトディレクトリのパスをコピーしました",
+    "project_directory_path_copied_with_branch": "プロジェクトディレクトリのパスをコピーしました — 作業は {{branch}} ブランチにあります"
   },
   "timeline": {
     "loading": "読み込み中..."
@@ -607,7 +609,8 @@
     "remove_parent_issue": "親タスクを解除",
     "remove_parent_issue_success": "親タスクを解除しました",
     "add_sub_issue": "サブタスクを追加...",
-    "delete_issue": "タスクを削除"
+    "delete_issue": "タスクを削除",
+    "copy_project_directory_path": "プロジェクトディレクトリのパスをコピー"
   },
   "pickers": {
     "custom_property": {
@@ -774,6 +777,21 @@
   "plugins": {
     "panels": "Plugins",
     "surface_failed": "{{name}} のインターフェースを読み込めませんでした。",
-    "surface_local_only": "{{name}} はローカルソースからインストールされているため、ブラウザでインターフェースを読み込めません。"
+    "surface_local_only": "{{name}} はローカルソースからインストールされているため、ブラウザでインターフェースを読み込めません。",
+    "hook_succeeded": "{{name}} が完了しました。",
+    "hook_failed": "{{name}} が失敗しました。",
+    "hook_refused": "{{name}} は実行されませんでした。",
+    "hook_activity": "最近の呼び出し",
+    "hook_never_run": "このフックはまだ実行されていません。"
+  },
+  "revision": {
+    "conflict": "タスクまたはコメントが変更されました。最新版に更新したので、比較してからもう一度保存してください。",
+    "compare_title": "タイトルが同時に変更されました。両方の内容を比較してください。",
+    "compare_description": "説明が同時に変更されました。両方の内容を比較してください。",
+    "compare_comment": "コメントが同時に変更されました。両方の内容を比較してください。",
+    "server_version": "サーバー上の最新版",
+    "local_version": "ローカル版",
+    "keep_local": "自分の版を使用",
+    "use_server": "最新版を使用"
   }
 }

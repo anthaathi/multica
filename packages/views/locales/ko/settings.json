@@ -750,6 +750,18 @@
       "storage_workspace": "워크스페이스 공유 데이터 저장",
       "net": "{{domain}}(으)로 데이터 전송",
       "unknown": "알 수 없는 권한 — 설치하지 마세요"
+    },
+    "hook_circuit_open": "반복 실패로 훅 전달이 중단되었습니다.",
+    "hook_recent_failures": "최근 훅 호출 {{count}}건이 실패했습니다.",
+    "mcp": {
+      "badge": "MCP",
+      "description": "이 훅은 플러그인 작성자의 MCP 서버가 제공하는 도구를 채택합니다. 에이전트가 호출할 수 있는 도구를 승인하세요. 나중에 추가된 도구는 승인하기 전까지 채택되지 않습니다.",
+      "loading": "도구를 불러오는 중",
+      "unreachable": "플러그인의 MCP 서버에 연결할 수 없습니다.",
+      "empty": "이 MCP 서버는 현재 제공하는 도구가 없습니다.",
+      "drifted": "스키마가 변경됨",
+      "save": "승인 저장",
+      "approved": "승인된 도구를 업데이트했습니다."
     }
   },
   "preferences": {
@@ -1318,7 +1330,8 @@
       "cancel": "취소",
       "save": "저장",
       "saving": "저장 중…",
-      "save_failed": "상태를 저장하지 못했습니다."
+      "save_failed": "상태를 저장하지 못했습니다.",
+      "key_hint": "API와 CLI에서는 {{key}}로 참조합니다."
     },
     "archive_dialog": {
       "title": "이 상태를 보관할까요?",
@@ -1336,5 +1349,46 @@
       "blocked": "외부 의존성으로 중단됨.",
       "cancelled": "진행하지 않기로 함."
     }
+  },
+  "telegram": {
+    "section_title": "Telegram",
+    "page_description": "각 Multica 에이전트를 전용 Telegram 봇에 연결하세요. 멤버는 봇에게 DM을 보내거나 그룹에서 @멘션하고, /issue를 입력해 Multica 태스크를 만들고, 에이전트의 답변을 실시간 스트리밍으로 볼 수 있습니다.",
+    "not_enabled_title": "Telegram 연동이 활성화되지 않았습니다",
+    "not_enabled_description_prefix": "서버에서",
+    "not_enabled_description_suffix": "를 설정하면 Telegram 봇 설치가 활성화됩니다.",
+    "not_enabled_self_host_hint": "셀프 호스팅 사용자는 프로젝트 README를 참고하세요.",
+    "preview_title": "Telegram 설치 곧 제공 예정",
+    "preview_description": "암호화 키는 설정되어 있지만 이 배포에서는 아직 설치할 수 없습니다. 가능해지면 연결 버튼이 여기에 표시됩니다.",
+    "connected_bots": "연결된 봇",
+    "loading": "불러오는 중…",
+    "load_failed": "Telegram 설치를 불러오지 못했습니다",
+    "empty_title": "아직 연결된 봇이 없습니다",
+    "empty_description_prefix": "이 워크스페이스의 에이전트를 열고",
+    "empty_description_cta": "Telegram 연결",
+    "empty_description_suffix": "을 클릭해 봇을 설치하세요.",
+    "revoked_badge": "해지됨",
+    "installed_at_label": "설치일 {{when}}",
+    "disconnect": "연결 해제",
+    "disconnecting": "해제 중…",
+    "disconnect_confirm_title": "이 Telegram 봇의 연결을 해제할까요?",
+    "disconnect_confirm_description": "봇이 이 워크스페이스의 Telegram 메시지를 더 이상 수신하지 않습니다. Multica의 대화 기록은 유지되며 같은 에이전트에서 다시 연결할 수 있습니다.",
+    "disconnect_confirm_cancel": "취소",
+    "toast_disconnected": "Telegram 봇 연결을 해제했습니다",
+    "toast_disconnect_failed": "연결 해제에 실패했습니다",
+    "bind_button": "Telegram 연결",
+    "bind_button_title": "{{agent}}을(를) Telegram 봇에 연결",
+    "agent_bot_connected_label": "Telegram에 연결됨",
+    "agent_bot_disconnect_tooltip": "이 에이전트와 Telegram 봇의 바인딩을 해제합니다. 봇은 더 이상 메시지를 수신하지 않습니다.",
+    "agent_bot_manage_link": "Telegram에서 열기",
+    "agent_bot_manage_tooltip": "Telegram에서 이 봇과의 채팅을 엽니다.",
+    "connect_dialog_title": "Telegram 봇 연결",
+    "connect_dialog_description": "Telegram의 @BotFather로 봇을 만든 뒤 아래에 토큰을 붙여넣으세요. 토큰은 즉시 검증되고 암호화되어 저장됩니다.",
+    "connect_docs_link": "단계별 가이드: Multica 에이전트를 Telegram에 연결하기",
+    "bot_token_label": "봇 토큰",
+    "connect_submit": "연결",
+    "connect_submitting": "연결 중…",
+    "connect_cancel": "취소",
+    "connect_success_toast": "Telegram 봇이 연결되었습니다",
+    "connect_failed_toast": "Telegram 봇을 연결할 수 없습니다"
   }
 }

@@ -310,7 +310,7 @@ func (e *Engine) applyRemoteComment(ctx context.Context, src db.IssueSyncSource,
 		}); err != nil {
 			return fmt.Errorf("issuesync: bump comment hash: %w", err)
 		}
-		e.publishComment(ctx, protocol.EventCommentUpdated, updated, link)
+		e.publishComment(ctx, protocol.EventCommentUpdated, commentFromUpdateRow(updated), link)
 		return nil
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
@@ -340,7 +340,7 @@ func (e *Engine) applyRemoteComment(ctx context.Context, src db.IssueSyncSource,
 	}); err != nil {
 		return fmt.Errorf("issuesync: create comment link: %w", err)
 	}
-	e.publishComment(ctx, protocol.EventCommentCreated, comment, link)
+	e.publishComment(ctx, protocol.EventCommentCreated, commentFromCreateRow(comment), link)
 	return nil
 }
 
@@ -432,7 +432,7 @@ func (e *Engine) syncLabels(ctx context.Context, issue db.Issue, remoteLabels []
 	changed := false
 	for lower, label := range have {
 		if !want[lower] {
-			if err := e.Queries.DetachLabelFromIssue(ctx, db.DetachLabelFromIssueParams{
+			if _, err := e.Queries.DetachLabelFromIssue(ctx, db.DetachLabelFromIssueParams{
 				IssueID:     issue.ID,
 				LabelID:     label.ID,
 				WorkspaceID: issue.WorkspaceID,
@@ -478,7 +478,7 @@ func (e *Engine) syncLabels(ctx context.Context, issue db.Issue, remoteLabels []
 				labelID = created.ID
 				byName[lower] = labelID
 			}
-			if err := e.Queries.AttachLabelToIssue(ctx, db.AttachLabelToIssueParams{
+			if _, err := e.Queries.AttachLabelToIssue(ctx, db.AttachLabelToIssueParams{
 				IssueID:     issue.ID,
 				LabelID:     labelID,
 				WorkspaceID: issue.WorkspaceID,
@@ -522,6 +522,54 @@ func (e *Engine) publishIssueUpdated(ctx context.Context, issue db.Issue, prevSt
 		WorkspaceID: util.UUIDToString(issue.WorkspaceID),
 		ActorType:   ActorTypeSync,
 		Payload:     payload,
+	})
+}
+
+// commentFromUpdateRow and commentFromCreateRow narrow the sqlc row types the
+// comment queries RETURN (they carry the new IssueRevision column) back to
+// db.Comment, which is what the engine's payload builders consume.
+func commentFromUpdateRow(row db.UpdateCommentRow) db.Comment {
+	return db.Comment{
+		ID:             row.ID,
+		IssueID:        row.IssueID,
+		AuthorType:     row.AuthorType,
+		AuthorID:       row.AuthorID,
+		Content:        row.Content,
+		Type:           row.Type,
+		CreatedAt:      row.CreatedAt,
+		UpdatedAt:      row.UpdatedAt,
+		ParentID:       row.ParentID,
+		WorkspaceID:    row.WorkspaceID,
+		ResolvedAt:     row.ResolvedAt,
+		ResolvedByType: row.ResolvedByType,
+		ResolvedByID:   row.ResolvedByID,
+		SourceTaskID:   row.SourceTaskID,
+		QuickActionID:  row.QuickActionID,
+		ViaPluginID:    row.ViaPluginID,
+		Revision:       row.Revision,
+	}
+}
+
+func commentFromCreateRow(row db.CreateCommentRow) db.Comment {
+	return commentFromUpdateRow(db.UpdateCommentRow{
+		ID:             row.ID,
+		IssueID:        row.IssueID,
+		AuthorType:     row.AuthorType,
+		AuthorID:       row.AuthorID,
+		Content:        row.Content,
+		Type:           row.Type,
+		CreatedAt:      row.CreatedAt,
+		UpdatedAt:      row.UpdatedAt,
+		ParentID:       row.ParentID,
+		WorkspaceID:    row.WorkspaceID,
+		ResolvedAt:     row.ResolvedAt,
+		ResolvedByType: row.ResolvedByType,
+		ResolvedByID:   row.ResolvedByID,
+		SourceTaskID:   row.SourceTaskID,
+		QuickActionID:  row.QuickActionID,
+		ViaPluginID:    row.ViaPluginID,
+		Revision:       row.Revision,
+		IssueRevision:  row.IssueRevision,
 	})
 }
 

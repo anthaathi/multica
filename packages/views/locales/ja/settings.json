@@ -750,6 +750,18 @@
       "storage_workspace": "ワークスペース共有のデータを保存する",
       "net": "{{domain}} にデータを送信する",
       "unknown": "認識できない権限です — インストールしないでください"
+    },
+    "hook_circuit_open": "連続失敗のためフックの配信を停止しました。",
+    "hook_recent_failures": "最近 {{count}} 件のフック呼び出しが失敗しました。",
+    "mcp": {
+      "badge": "MCP",
+      "description": "このフックはプラグイン作者自身の MCP サーバーのツールを採用します。エージェントが呼び出せるツールを承認してください。後から追加されたツールは、承認するまで採用されません。",
+      "loading": "ツールを読み込み中",
+      "unreachable": "プラグインの MCP サーバーに接続できませんでした。",
+      "empty": "この MCP サーバーは現在ツールを提供していません。",
+      "drifted": "スキーマが変更されました",
+      "save": "承認を保存",
+      "approved": "承認済みツールを更新しました。"
     }
   },
   "preferences": {
@@ -1318,7 +1330,8 @@
       "cancel": "キャンセル",
       "save": "保存",
       "saving": "保存中…",
-      "save_failed": "ステータスを保存できませんでした。"
+      "save_failed": "ステータスを保存できませんでした。",
+      "key_hint": "API と CLI では {{key}} として参照されます。"
     },
     "archive_dialog": {
       "title": "このステータスをアーカイブしますか？",
@@ -1336,5 +1349,46 @@
       "blocked": "外部依存でブロック中。",
       "cancelled": "見送り。"
     }
+  },
+  "telegram": {
+    "section_title": "Telegram",
+    "page_description": "各 Multica エージェントを専用の Telegram ボットに接続します。メンバーはボットに DM を送ったり、グループで @メンションしたり、/issue と入力して Multica タスクを作成したり、エージェントの返信をリアルタイムで確認できます。",
+    "not_enabled_title": "Telegram 連携が有効になっていません",
+    "not_enabled_description_prefix": "サーバーで",
+    "not_enabled_description_suffix": "を設定すると Telegram ボットのインストールが有効になります。",
+    "not_enabled_self_host_hint": "セルフホストの場合はプロジェクトの README をご覧ください。",
+    "preview_title": "Telegram インストールは近日公開",
+    "preview_description": "暗号化キーは設定済みですが、このデプロイではまだインストールできません。利用可能になると接続ボタンがここに表示されます。",
+    "connected_bots": "接続済みのボット",
+    "loading": "読み込み中…",
+    "load_failed": "Telegram のインストールを読み込めませんでした",
+    "empty_title": "接続済みのボットはまだありません",
+    "empty_description_prefix": "このワークスペースのエージェントを開き、",
+    "empty_description_cta": "Telegram に接続",
+    "empty_description_suffix": "をクリックしてボットをインストールします。",
+    "revoked_badge": "無効化済み",
+    "installed_at_label": "インストール日時 {{when}}",
+    "disconnect": "切断",
+    "disconnecting": "切断中…",
+    "disconnect_confirm_title": "この Telegram ボットを切断しますか？",
+    "disconnect_confirm_description": "ボットはこのワークスペースの Telegram メッセージを受信しなくなります。Multica 内のチャット履歴は保持され、同じエージェントから再接続できます。",
+    "disconnect_confirm_cancel": "キャンセル",
+    "toast_disconnected": "Telegram ボットを切断しました",
+    "toast_disconnect_failed": "切断に失敗しました",
+    "bind_button": "Telegram に接続",
+    "bind_button_title": "{{agent}} を Telegram ボットに接続",
+    "agent_bot_connected_label": "Telegram に接続済み",
+    "agent_bot_disconnect_tooltip": "このエージェントと Telegram ボットのバインドを解除します。ボットはメッセージを受信しなくなります。",
+    "agent_bot_manage_link": "Telegram で開く",
+    "agent_bot_manage_tooltip": "Telegram でこのボットとのチャットを開きます。",
+    "connect_dialog_title": "Telegram ボットを接続",
+    "connect_dialog_description": "Telegram の @BotFather でボットを作成し、そのトークンを以下に貼り付けてください。トークンは即時検証され、暗号化して保存されます。",
+    "connect_docs_link": "手順ガイド：Multica エージェントを Telegram に接続する",
+    "bot_token_label": "ボットトークン",
+    "connect_submit": "接続",
+    "connect_submitting": "接続中…",
+    "connect_cancel": "キャンセル",
+    "connect_success_toast": "Telegram ボットを接続しました",
+    "connect_failed_toast": "Telegram ボットを接続できませんでした"
   }
 }
