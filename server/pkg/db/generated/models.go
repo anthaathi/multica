@@ -529,7 +529,6 @@ type DingtalkGroupRoute struct {
 	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
 }
 
-
 type ExternalCommentLink struct {
 	ID                pgtype.UUID        `json:"id"`
 	IssueLinkID       pgtype.UUID        `json:"issue_link_id"`
@@ -902,23 +901,6 @@ type IssueToLabel struct {
 	LabelID pgtype.UUID `json:"label_id"`
 }
 
-type JiraConnection struct {
-	ID                     pgtype.UUID        `json:"id"`
-	WorkspaceID            pgtype.UUID        `json:"workspace_id"`
-	CloudID                string             `json:"cloud_id"`
-	SiteUrl                string             `json:"site_url"`
-	AccountID              string             `json:"account_id"`
-	AccountEmail           pgtype.Text        `json:"account_email"`
-	AccountAvatarUrl       pgtype.Text        `json:"account_avatar_url"`
-	AccessTokenEncrypted   []byte             `json:"access_token_encrypted"`
-	RefreshTokenEncrypted  []byte             `json:"refresh_token_encrypted"`
-	TokenExpiresAt         pgtype.Timestamptz `json:"token_expires_at"`
-	WebhookSecretEncrypted []byte             `json:"webhook_secret_encrypted"`
-	ConnectedByID          pgtype.UUID        `json:"connected_by_id"`
-	CreatedAt              pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt              pgtype.Timestamptz `json:"updated_at"`
-}
-
 type IssueVcsPullRequest struct {
 	IssueID       pgtype.UUID        `json:"issue_id"`
 	PullRequestID pgtype.UUID        `json:"pull_request_id"`
@@ -953,6 +935,23 @@ type IssueViewPreference struct {
 	ScopeID     pgtype.UUID        `json:"scope_id"`
 	Prefs       []byte             `json:"prefs"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+type JiraConnection struct {
+	ID                     pgtype.UUID        `json:"id"`
+	WorkspaceID            pgtype.UUID        `json:"workspace_id"`
+	CloudID                string             `json:"cloud_id"`
+	SiteUrl                string             `json:"site_url"`
+	AccountID              string             `json:"account_id"`
+	AccountEmail           pgtype.Text        `json:"account_email"`
+	AccountAvatarUrl       pgtype.Text        `json:"account_avatar_url"`
+	AccessTokenEncrypted   []byte             `json:"access_token_encrypted"`
+	RefreshTokenEncrypted  []byte             `json:"refresh_token_encrypted"`
+	TokenExpiresAt         pgtype.Timestamptz `json:"token_expires_at"`
+	WebhookSecretEncrypted []byte             `json:"webhook_secret_encrypted"`
+	ConnectedByID          pgtype.UUID        `json:"connected_by_id"`
+	CreatedAt              pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt              pgtype.Timestamptz `json:"updated_at"`
 }
 
 type LarkBindingToken struct {
