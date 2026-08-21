@@ -382,6 +382,7 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 		opts.BusinessMetrics.RecordEntitlementConfigError()
 	} else if entitlementClient.Enabled() {
 		entitlementClient.SetEmergencyDisabled(envBool("MULTICA_ENTITLEMENT_EMERGENCY_DISABLED", false))
+		h.Entitlements = entitlementClient
 		h.AutopilotService.Entitlements = entitlementClient
 		h.AutopilotService.QuotaMetrics = opts.BusinessMetrics
 	}
@@ -900,7 +901,8 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					slog.Default(),
 				)
 			}
-			channelRouter.Register(dingtalk.TypeDingTalk, dingtalk.NewDingTalkResolverSet(queries, pool, replier, ack, media))
+			botNames := dingtalk.NewBotNameResolver(dingtalkClient, box.Open)
+			channelRouter.Register(dingtalk.TypeDingTalk, dingtalk.NewDingTalkResolverSet(queries, pool, replier, ack, media, botNames))
 			dingtalk.NewOutbound(queries, box.Open, dingtalkClient, slog.Default()).Register(bus)
 			dingtalk.RegisterDingTalk(channelRegistry, dingtalk.ChannelDeps{
 				Decrypt: box.Open,
@@ -1262,6 +1264,10 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 	// task. Returns nil when rdb is nil — TaskService treats that
 	// as "no cache, always hit DB" (existing behavior).
 	h.TaskService.EmptyClaim = service.NewEmptyClaimCache(rdb)
+	// Stale-dispatch reclaim has a separate schedule because an empty queued
+	// verdict cannot represent a claim response lost after commit. Missing or
+	// failed Redis state keeps the historical PostgreSQL fallback.
+	h.TaskService.ReclaimCheck = service.NewReclaimCheckCache(rdb)
 
 	// Wire WS heartbeat after stores are finalized so the WS path uses the
 	// same (possibly Redis-backed) stores as the HTTP path.
@@ -1608,6 +1614,10 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					// see what is mounted in their workspace and which scopes
 					// it holds; install / configure / remove stay admin-only.
 					r.Get("/plugins", h.ListPlugins)
+					// A surface's code, read from the version the workspace
+					// installed. Member-visible because opening an issue is
+					// what asks for it.
+					r.Get("/plugins/{installationId}/surfaces/{surfaceKey}/script", h.GetPluginSurfaceScript)
 				})
 				// Admin-level access
 				r.Group(func(r chi.Router) {
@@ -1634,10 +1644,20 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					r.Patch("/runtime-profiles/{profileId}", h.UpdateRuntimeProfile)
 					r.Put("/runtime-profiles/{profileId}", h.UpdateRuntimeProfile)
 					r.Delete("/runtime-profiles/{profileId}", h.DeleteRuntimeProfile)
+					// Publishing. The author uploads an artifact bundle and we
+					// store it; a version is immutable once published, so
+					// there is no update route here by design.
+					r.Get("/plugins/packages", h.ListPluginPackages)
+					r.Post("/plugins/packages", h.PublishPluginPackage)
+					r.Post("/plugins/packages/local", h.PublishLocalPluginPackage)
+					r.Delete("/plugins/packages/{packageId}", h.DeletePluginPackage)
 					// Installing a Plugin is two steps on purpose: preview
-					// parses the manifest and returns the scope list without
-					// writing anything, so the consent screen has something to
-					// show before an installation exists.
+					// reads the published version's manifest and returns the
+					// scope list without writing anything, so the consent
+					// screen has something to show before an installation
+					// exists. Both steps name the same version id, which is
+					// what makes the approved manifest and the running code
+					// the same artifact.
 					r.Post("/plugins/preview", h.PreviewPlugin)
 					r.Post("/plugins", h.InstallPlugin)
 					r.Get("/plugins/{installationId}/invocations", h.ListPluginInvocations)
@@ -1738,13 +1758,10 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 				r.Group(func(r chi.Router) {
 					r.Use(middleware.RequireWorkspaceMemberFromURL(queries, "id"))
 					r.Get("/dingtalk/installations", h.ListDingTalkInstallations)
-					r.Get("/dingtalk/group-routes", h.ListDingTalkGroupRoutes)
-				})
-				r.Group(func(r chi.Router) {
-					r.Use(middleware.RequireWorkspaceRoleFromURL(queries, "id", "owner", "admin"))
+					r.Get("/dingtalk/groups", h.ListDingTalkGroups)
+					r.Delete("/dingtalk/installations/{installationId}/groups/{conversationId}", h.ForgetDingTalkGroup)
 					r.Delete("/dingtalk/installations/{installationId}", h.RevokeDingTalkInstallation)
 					r.Post("/dingtalk/install/byo", h.RegisterDingTalkBYO)
-					r.Patch("/dingtalk/group-routes/{routeId}", h.UpdateDingTalkGroupRoute)
 				})
 
 				// Telegram integration. Same admin/member split as Slack:
@@ -1873,6 +1890,8 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 			r.Group(func(r chi.Router) {
 				r.Use(middleware.RequireWorkspaceRole(queries, "owner", "admin"))
 				r.Post("/checkout-sessions", h.CreateCloudWorkspaceSubscriptionCheckout)
+				r.Post("/seats/purchase-preview", h.PreviewCloudWorkspaceSubscriptionSeatPurchase)
+				r.Post("/seats/purchases", h.PurchaseCloudWorkspaceSubscriptionSeats)
 				r.Post("/seats/reconcile", h.ReconcileCloudWorkspaceSubscriptionSeats)
 				r.Post("/portal-sessions", h.CreateCloudWorkspaceSubscriptionPortal)
 			})
@@ -1887,6 +1906,7 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 
 			// Issues
 			r.Route("/api/issues", func(r chi.Router) {
+				r.Get("/window-usage", h.GetIssueWindowUsage)
 				r.Post("/table/groups", h.ListIssueTableGroups)
 				r.Post("/table/rows", h.ListIssueTableRows)
 				r.Post("/table/facets", h.ListIssueTableFacets)
@@ -2114,6 +2134,7 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					r.Post("/restore", h.RestoreAgent)
 					r.Post("/cancel-tasks", h.CancelAgentTasks)
 					r.Get("/tasks", h.ListAgentTasks)
+					r.Get("/dingtalk/groups", h.ListDingTalkGroupsForAgent)
 					r.Get("/skills", h.ListAgentSkills)
 					r.Put("/skills", h.SetAgentSkills)
 					r.Post("/skills/add", h.AddAgentSkills)

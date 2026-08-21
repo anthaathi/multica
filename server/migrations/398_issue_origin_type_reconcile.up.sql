@@ -1,0 +1,57 @@
+-- Reconcile issue.origin_type CHECK constraint to the full union of values
+-- across upstream and the fork. Renumbered 157 -> 161 -> 163 -> 164 -> 175
+-- (157_agent_task_delivered_comments), then 161 (161_agent_skill_enabled), then
+-- 163 (163_agent_builder), then 164 (164_attachment_task_id, PR #5307), then
+-- 175 (175_runtime_profile_add_deveco), then 191 (191_issue_properties,
+-- MUL-4463), then 202 (202_runtime_profile_add_qwen), then 203
+-- (203_issue_workspace_assignee_index, sync 2026-07-23), then 214
+-- (224_agent_task_session_rollout_missing, sync 2026-08-03), then 253
+-- (253_runtime_profile_add_qwenpaw, sync 2026-08-04), then 254
+-- (254_runtime_profile_add_reasonix, plus 255_agent_task_queue_chat_pending_deferred_v3
+-- and 256_drop_agent_task_queue_chat_pending_v2, sync 2026-08-06), then 257
+-- (257_agent_task_queue_channel_media_pending_unique_v2, sync 2026-08-06), then
+-- 263 (263_issue_origin_wecom_chat + 264_issue_origin_wecom_chat_validate,
+-- sync 2026-08-07), then 265 (265_issue_view, sync 2026-08-12), then 300
+-- (collision with upstream 300_drop_redundant_issue_workspace_number_index,
+-- upstream max 313_runtime_profile_add_dsh, sync 2026-08-13), then 314
+-- (upstream 314-318 workspace MCP family: workspace_mcp_config,
+-- workspace_mcp_server, workspace_mcp_server_name_unique,
+-- agent_mcp_server_server_index, drop_workspace_mcp_config;
+-- sync 2026-08-15), then 327 (upstream 319-326 remote MCP plugin family:
+-- remote_mcp_plugin_v1, plugin installation config/secret indexes,
+-- plugin_remote_mcp_oauth + state expiry index; sync 2026-08-16), then 342
+-- (upstream 327-341: workspace share-link family, per-workspace issue-status
+-- catalog family, 341_issue_property_actor_types; sync 2026-08-18), then 349
+-- (upstream 342_runtime_profile_add_mcode + 343-348 comment-index/plugin-v2
+-- family; sync 2026-08-19), then 370 (upstream 349-369: agent-task-queue
+-- chat indexes, issue_comment_revision, autopilot quota family,
+-- plugin_invocation/hook-engine family, skill plugin ownership, plugin MCP
+-- approvals, and 366/367 issue_origin_telegram_chat which redefines the
+-- CHECK without the fork's values; sync 2026-08-20), then 398 (upstream
+-- 370-397: runtime_profile_add_dim renumbered the durable-work-dir
+-- collision to 376, dingtalk group-presence/bot-identity family,
+-- plugin-package publishing family, dispatch-reclaim indexes; none touch
+-- issue.origin_type; sync 2026-08-21); runs last
+-- so the union survives regardless of which same-prefix 149 migration ran.
+--
+-- This rebuild must carry every value added by earlier issue_origin_*
+-- migrations, including upstream's 'wecom_chat' (263) and 'telegram_chat'
+-- (366) and the fork's 'issue_sync'/'mattermost_chat' (149), or it would
+-- silently drop them.
+--
+-- Two prefix-149 migrations each redefined issue_origin_type_check with a
+-- hardcoded list, and they run in sorted-filename order:
+--   149_issue_origin_agent_create   (upstream) -> adds 'agent_create'
+--   149_issue_origin_mattermost_chat (fork)     -> re-adds the constraint with
+--       the fork's own values ('issue_sync', 'mattermost_chat') but WITHOUT
+--       'agent_create' (it predated the upstream change), so the fork's 149
+--       ran second and dropped 'agent_create'.
+-- The result rejected origin_type='agent_create', breaking agent-created
+-- issues (MUL-4305). This forward-only migration restores the complete value
+-- set so agent-created issues are accepted alongside the fork's issue_sync /
+-- mattermost_chat origins. Idempotent: re-establishes the constraint with the
+-- union regardless of which 149 ran last, so it is correct on both fresh and
+-- already-migrated databases.
+ALTER TABLE issue DROP CONSTRAINT IF EXISTS issue_origin_type_check;
+ALTER TABLE issue ADD CONSTRAINT issue_origin_type_check
+    CHECK (origin_type IN ('autopilot', 'quick_create', 'lark_chat', 'slack_chat', 'agent_create', 'dingtalk_chat', 'issue_sync', 'mattermost_chat', 'wecom_chat', 'telegram_chat'));

@@ -24,14 +24,17 @@ func TestBuildOmpArgsFreshRun(t *testing.T) {
 		"-p",
 		"--mode json",
 		"--session-dir /tmp/omp-sessions",
-		"--provider anthropic",
-		"--model claude-sonnet-4-20250514",
+		"--model anthropic/claude-sonnet-4-20250514",
 		"--append-system-prompt",
 		"--thinking low",
 	} {
 		if !strings.Contains(joined, want) {
 			t.Errorf("expected %q in args, got: %v", want, args)
 		}
+	}
+
+	if strings.Contains(joined, "--provider") {
+		t.Errorf("--provider must never be synthesized (GH #7300 / MUL-6471), got: %v", args)
 	}
 
 	// Fresh run must NOT pass --resume.

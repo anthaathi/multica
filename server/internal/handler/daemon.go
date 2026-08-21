@@ -10,12 +10,10 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"os"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -24,6 +22,7 @@ import (
 	"github.com/multica-ai/multica/server/internal/analytics"
 	"github.com/multica-ai/multica/server/internal/auth"
 	"github.com/multica-ai/multica/server/internal/daemonws"
+	"github.com/multica-ai/multica/server/internal/entitlement"
 	"github.com/multica-ai/multica/server/internal/integrations/mattermost"
 	"github.com/multica-ai/multica/server/internal/integrations/slack"
 	"github.com/multica-ai/multica/server/internal/issuestatus"
@@ -33,6 +32,7 @@ import (
 	"github.com/multica-ai/multica/server/internal/service"
 	"github.com/multica-ai/multica/server/internal/util"
 	db "github.com/multica-ai/multica/server/pkg/db/generated"
+	"github.com/multica-ai/multica/server/pkg/dbid"
 	"github.com/multica-ai/multica/server/pkg/protocol"
 	"github.com/multica-ai/multica/server/pkg/redact"
 	"github.com/multica-ai/multica/server/pkg/skillbundle"
@@ -1748,6 +1748,7 @@ func (h *Handler) ClaimTasksByRuntime(w http.ResponseWriter, r *http.Request) {
 		// the exact claim is requeued and omitted from this batch.
 		commentBackedTask := task.TriggerCommentID.Valid || len(task.CoalescedCommentIds) > 0
 		receipt, ferr := h.TaskService.FinalizeTaskClaim(r.Context(), task, db.CreateTaskTokenParams{
+			ID:          dbid.NewV7(),
 			TokenHash:   auth.HashToken(tokenStr),
 			TaskID:      task.ID,
 			AgentID:     task.AgentID,
@@ -1891,6 +1892,36 @@ func claimResponseAgentIdentityMatches(resp AgentTaskResponse) bool {
 func (h *Handler) buildClaimedTaskResponse(r *http.Request, task *db.AgentTaskQueue, runtime db.AgentRuntime, runtimeID, runtimeWorkspaceID string) (resp AgentTaskResponse, deliveredCommentIDs []pgtype.UUID, agentSkillCount, builtinSkillCount int, failure *claimBuildFailure) {
 	// Build response with fresh agent data (name + skills + custom_env + custom_args).
 	resp = taskToResponse(*task, runtimeWorkspaceID)
+	if task.IssueID.Valid {
+		if policy, enabled := h.issueWindowPolicy(r.Context(), runtime.WorkspaceID); enabled {
+			visible, visibilityErr := h.issueIDsWithinWindow(r.Context(), runtime.WorkspaceID, policy, []pgtype.UUID{task.IssueID})
+			if visibilityErr != nil {
+				h.recordIssueWindow(policy.action, "agent_context", "error")
+				if policy.action == entitlement.ActionEnforce {
+					if _, requeueErr := h.TaskService.RequeueTaskAfterClaimFailure(r.Context(), *task); requeueErr != nil {
+						slog.Error("task claim: requeue after issue window failure failed", "task_id", uuidToString(task.ID), "error", requeueErr)
+					}
+					return resp, nil, 0, 0, &claimBuildFailure{
+						outcome: "error_issue_window_check", status: http.StatusInternalServerError, message: "failed to check issue access",
+					}
+				}
+			} else if !visible {
+				if policy.action == entitlement.ActionObserve {
+					h.recordIssueWindow(policy.action, "agent_context", "would_block")
+				} else {
+					h.recordIssueWindow(policy.action, "agent_context", "blocked")
+					return resp, nil, 0, 0, h.failClaimedTaskBeforeLaunch(
+						r.Context(), task,
+						"This issue is outside the workspace's recently created issue window.",
+						taskfailure.ReasonIssueWindowRestricted,
+						"error_issue_window_restricted", http.StatusPaymentRequired, "issue is outside the recently created window",
+					)
+				}
+			} else {
+				h.recordIssueWindow(policy.action, "agent_context", "allowed")
+			}
+		}
+	}
 	// Claim-only capability: this server resolves the squad-leader role on the
 	// wire (is_leader_task / squad_id), so the daemon must not re-derive it
 	// from the briefing text. Set unconditionally — on every claim, leader or
@@ -3001,6 +3032,40 @@ func (h *Handler) buildClaimedTaskResponse(r *http.Request, task *db.AgentTaskQu
 		)
 	}
 
+	// Workspace status catalog (MUL-6460): active CUSTOM statuses only, so the
+	// daemon can render them into the brief's status-command line. Not gated on
+	// the custom_issue_statuses flag — the flag only guards creation, and a
+	// catalog written before a flag flip must stay visible to agents as long as
+	// issues can sit on it. Read on every claim, like the agent row, so an
+	// admin's edit lands on the next task. Failure degrades to the built-in-only
+	// brief rather than failing the claim.
+	if entries, err := h.Queries.ListIssueStatusEntries(r.Context(), db.ListIssueStatusEntriesParams{
+		WorkspaceID:     parseUUID(resp.WorkspaceID),
+		IncludeArchived: false,
+	}); err != nil {
+		slog.Warn("task claim: failed to load issue status catalog for brief injection",
+			"task_id", uuidToString(task.ID),
+			"workspace_id", resp.WorkspaceID,
+			"error", err,
+		)
+	} else {
+		for _, entry := range entries {
+			if entry.IsSystem {
+				continue
+			}
+			if len(resp.IssueStatuses) == taskIssueStatusCap {
+				resp.IssueStatusesOmitted++
+				continue
+			}
+			resp.IssueStatuses = append(resp.IssueStatuses, TaskIssueStatusData{
+				Key:         entry.Key,
+				Name:        entry.Name,
+				Category:    entry.Category,
+				Description: entry.Description,
+			})
+		}
+	}
+
 	// Last gate before dispatch: refuse to hand a worktree-mode local_directory
 	// task to a daemon that cannot implement the mode.
 	//
@@ -3236,6 +3301,7 @@ func (h *Handler) ClaimTaskByRuntime(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	receipt, ferr := h.TaskService.FinalizeTaskClaim(r.Context(), *task, db.CreateTaskTokenParams{
+		ID:          dbid.NewV7(),
 		TokenHash:   auth.HashToken(tokenStr),
 		TaskID:      task.ID,
 		AgentID:     task.AgentID,
@@ -4396,36 +4462,51 @@ func (h *Handler) ReportTaskMessages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Verify the caller owns this task's workspace.
-	task, ok := h.requireDaemonTaskAccess(w, r, taskID)
+	// Verify the caller owns this task's workspace. The access check already
+	// resolves the workspace id (it needs it to authorize the daemon), so take
+	// it from there instead of re-running GetIssue / GetChatSession: this
+	// endpoint fires every 500ms for every running task, and that second
+	// lookup was a whole extra query per batch on the hottest write path in
+	// the system (MUL-6523).
+	task, wsID, ok := h.requireDaemonTaskAccessWithWorkspace(w, r, taskID)
 	if !ok {
 		return
 	}
 
+	// Broadcast reach is deliberately unchanged: only issue- and chat-backed
+	// tasks streamed live messages before, and widening that to autopilot /
+	// quick-create tasks is a product decision, not part of this optimization.
 	workspaceID := ""
-	if task.IssueID.Valid {
-		if issue, err := h.Queries.GetIssue(r.Context(), task.IssueID); err == nil {
-			workspaceID = uuidToString(issue.WorkspaceID)
-		}
-	}
-	if workspaceID == "" && task.ChatSessionID.Valid {
-		if cs, err := h.Queries.GetChatSession(r.Context(), task.ChatSessionID); err == nil {
-			workspaceID = uuidToString(cs.WorkspaceID)
-		}
+	if task.IssueID.Valid || task.ChatSessionID.Valid {
+		workspaceID = wsID
 	}
 
-	messageIDs := make([]pgtype.UUID, len(req.Messages))
-	for i := range messageIDs {
+	// Column-wise parameters for the single batch insert below. Building them
+	// as parallel arrays rather than as one JSON document is deliberate: these
+	// strings were just decoded out of the request, and re-encoding content /
+	// output into JSON would make the server escape every byte a second time
+	// and Postgres parse the envelope back out — measurably worse on exactly
+	// the large messages that are already the most expensive (MUL-6523). Empty
+	// string means SQL NULL, applied by the query's NULLIF.
+	n := len(req.Messages)
+	params := db.CreateTaskMessagesParams{
+		TaskID:   parseUUID(taskID),
+		Ids:      make([]pgtype.UUID, 0, n),
+		Seqs:     make([]int32, 0, n),
+		Types:    make([]string, 0, n),
+		Tools:    make([]string, 0, n),
+		Contents: make([]string, 0, n),
+		Inputs:   make([]string, 0, n),
+		Outputs:  make([]string, 0, n),
+	}
+	for _, msg := range req.Messages {
 		id, err := uuid.NewV7()
 		if err != nil {
 			slog.Error("failed to generate task message id", "task_id", taskID, "error", err)
 			writeError(w, http.StatusInternalServerError, "failed to persist task message")
 			return
 		}
-		messageIDs[i] = pgtype.UUID{Bytes: [16]byte(id), Valid: true}
-	}
 
-	for i, msg := range req.Messages {
 		// Redact sensitive information before persisting or broadcasting.
 		msg.Content = redact.Text(msg.Content)
 		msg.Output = redact.Text(msg.Output)
@@ -4437,7 +4518,9 @@ func (h *Handler) ReportTaskMessages(w http.ResponseWriter, r *http.Request) {
 		// binary, or a Windows tool emitting UTF-16 — and this endpoint has no
 		// retry on the daemon side, so an unsanitized batch is silently lost
 		// (GH #7098). Input is a JSONB column, so it needs the deep walk: the
-		// offending byte can sit at any depth of a tool's arguments.
+		// offending byte can sit at any depth of a tool's arguments. Batching
+		// raises the stakes: one bad byte now fails the whole statement rather
+		// than a single row, which is inherent to one-statement writes.
 		msg.Type = util.SanitizeTextForPostgres(msg.Type)
 		msg.Tool = util.SanitizeTextForPostgres(msg.Tool)
 		msg.Content = util.SanitizeTextForPostgres(msg.Content)
@@ -4448,30 +4531,50 @@ func (h *Handler) ReportTaskMessages(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		var inputJSON []byte
+		inputJSON := ""
 		if msg.Input != nil {
-			inputJSON, _ = json.Marshal(msg.Input)
-		}
-		created, createErr := h.Queries.CreateTaskMessage(r.Context(), db.CreateTaskMessageParams{
-			ID:      messageIDs[i],
-			TaskID:  parseUUID(taskID),
-			Seq:     int32(msg.Seq),
-			Type:    msg.Type,
-			Tool:    pgtype.Text{String: msg.Tool, Valid: msg.Tool != ""},
-			Content: pgtype.Text{String: msg.Content, Valid: msg.Content != ""},
-			Input:   inputJSON,
-			Output:  pgtype.Text{String: msg.Output, Valid: msg.Output != ""},
-		})
-		if createErr != nil {
-			slog.Error("failed to create task message", "task_id", taskID, "seq", msg.Seq, "error", createErr)
-			writeError(w, http.StatusInternalServerError, "failed to persist task message")
-			return
+			// Fail loud rather than dropping the field: a tool call whose
+			// arguments silently vanish is worse than a 500 the daemon logs,
+			// because the transcript then shows a tool_use with no input and
+			// nothing anywhere records that it was lost.
+			encoded, err := json.Marshal(msg.Input)
+			if err != nil {
+				slog.Error("failed to encode task message input", "task_id", taskID, "seq", msg.Seq, "error", err)
+				writeError(w, http.StatusInternalServerError, "failed to persist task message")
+				return
+			}
+			inputJSON = string(encoded)
 		}
 
-		if workspaceID != "" {
+		params.Ids = append(params.Ids, pgtype.UUID{Bytes: [16]byte(id), Valid: true})
+		params.Seqs = append(params.Seqs, int32(msg.Seq))
+		params.Types = append(params.Types, msg.Type)
+		params.Tools = append(params.Tools, msg.Tool)
+		params.Contents = append(params.Contents, msg.Content)
+		params.Inputs = append(params.Inputs, inputJSON)
+		params.Outputs = append(params.Outputs, msg.Output)
+	}
+
+	created, err := h.Queries.CreateTaskMessages(r.Context(), params)
+	if err != nil {
+		slog.Error("failed to create task messages", "task_id", taskID, "count", n, "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to persist task message")
+		return
+	}
+
+	if workspaceID != "" {
+		// CreateTaskMessages orders its result by seq, which is the daemon's
+		// own within-batch ordering — so this publishes in the same order the
+		// per-message loop did. A bare INSERT ... RETURNING has no row-order
+		// guarantee, and subscribers render these events as they arrive, so the
+		// ordering lives in the query rather than in the clients.
+		for _, m := range created {
+			// The ordered CTE makes sqlc name the row type after the query
+			// rather than reusing the table model; the columns are the table's,
+			// in order, so the conversion is checked by the compiler and breaks
+			// loudly if the query ever stops returning the whole row.
 			h.publishTask(protocol.EventTaskMessage, workspaceID, "system", "", taskID,
-				truncateTaskMessageForBroadcast(
-					taskMessageToPayload(created, taskID, uuidToString(task.IssueID))))
+				taskMessageToPayload(db.TaskMessage(m), taskID, uuidToString(task.IssueID)))
 		}
 	}
 
@@ -4599,152 +4702,6 @@ func taskMessageToPayload(m db.TaskMessage, taskID, issueID string) protocol.Tas
 		Output:    m.Output.String,
 		CreatedAt: createdAt,
 	}
-}
-
-// taskMessageBroadcastClipEnv gates the clipping below. It is OFF by default,
-// and must stay off until clients that understand `truncated` have saturated.
-//
-// Clipping is not an additive field a client can ignore: it changes the meaning
-// of `input` / `output`, which every existing client already consumes. A client
-// built before this PR writes the clipped copy into a `staleTime: Infinity`
-// cache and never refetches, so its execution log would stay incomplete until
-// the window is reloaded. The client half of this change (the `truncated`
-// reader) ships first; flipping this env var is the second step, once installed
-// builds have caught up.
-//
-// Routing by connection capability instead would be the principled fix, but the
-// hub does not retain the `client_version` it is handed at upgrade, and frames
-// cross nodes through the Redis relay as already-serialized bytes — so it needs
-// the same protocol work that per-task scope routing is waiting on
-// (server/cmd/server/listeners.go). Deliberately one env var, not that.
-const taskMessageBroadcastClipEnv = "MULTICA_CLIP_TASK_MESSAGE_BROADCAST"
-
-// taskMessageBroadcastClipEnabled reports whether oversized tool input/output
-// should be clipped out of the realtime copy of a task message.
-func taskMessageBroadcastClipEnabled() bool {
-	v := strings.TrimSpace(os.Getenv(taskMessageBroadcastClipEnv))
-	return v == "1" || strings.EqualFold(v, "true")
-}
-
-// Byte budgets for the realtime fanout of a task message (MUL-6396).
-//
-// A `task:message` frame is broadcast to EVERY client in the workspace, and a
-// tool_use input is unbounded: a Write of a large file, or a MultiEdit with
-// long old/new strings, ships the whole body to every open client, which then
-// retains it. Persisted rows keep the full content — only the broadcast copy
-// is clipped, and `Truncated` tells the client to backfill from the REST
-// endpoint when it actually needs the full text.
-const (
-	// broadcastStringLimit caps each individual string inside Input, so small
-	// fields (file_path, command, description) survive intact and only the
-	// genuinely large ones are clipped.
-	broadcastStringLimit = 4096
-	// broadcastInputLimit caps the serialized Input after per-string clipping.
-	// A map with thousands of small keys can still be large; past this the
-	// input is dropped entirely and the client backfills.
-	broadcastInputLimit = 16384
-	// broadcastOutputLimit mirrors the daemon-side cap on tool output
-	// (see daemon.reportMessages). Belt and braces: other producers, and any
-	// future relaxation of the daemon cap, must not reopen the fanout hole.
-	broadcastOutputLimit = 8192
-)
-
-// clipUTF8 truncates s to at most limit bytes without splitting a rune.
-func clipUTF8(s string, limit int) string {
-	if len(s) <= limit {
-		return s
-	}
-	cut := limit
-	for cut > 0 && !utf8.RuneStart(s[cut]) {
-		cut--
-	}
-	return s[:cut]
-}
-
-// clipJSONValue returns v with every string at any depth clipped to
-// broadcastStringLimit. It never mutates the input: containers are rebuilt
-// only when something inside them actually changed.
-func clipJSONValue(v any) (any, bool) {
-	switch t := v.(type) {
-	case string:
-		if len(t) <= broadcastStringLimit {
-			return t, false
-		}
-		return clipUTF8(t, broadcastStringLimit), true
-	case map[string]any:
-		var out map[string]any
-		for k, val := range t {
-			clipped, did := clipJSONValue(val)
-			if !did {
-				continue
-			}
-			if out == nil {
-				out = make(map[string]any, len(t))
-				for ck, cv := range t {
-					out[ck] = cv
-				}
-			}
-			out[k] = clipped
-		}
-		if out == nil {
-			return t, false
-		}
-		return out, true
-	case []any:
-		var out []any
-		for i, val := range t {
-			clipped, did := clipJSONValue(val)
-			if !did {
-				continue
-			}
-			if out == nil {
-				out = make([]any, len(t))
-				copy(out, t)
-			}
-			out[i] = clipped
-		}
-		if out == nil {
-			return t, false
-		}
-		return out, true
-	default:
-		return v, false
-	}
-}
-
-// truncateTaskMessageForBroadcast clips the realtime copy of a task message so
-// one oversized tool call cannot flood every client in the workspace. The
-// returned payload is a copy; the caller's row and the REST responses built
-// from it are untouched.
-func truncateTaskMessageForBroadcast(p protocol.TaskMessagePayload) protocol.TaskMessagePayload {
-	if !taskMessageBroadcastClipEnabled() {
-		return p
-	}
-
-	truncated := false
-
-	if len(p.Output) > broadcastOutputLimit {
-		p.Output = clipUTF8(p.Output, broadcastOutputLimit)
-		truncated = true
-	}
-
-	if p.Input != nil {
-		clipped, didClip := clipJSONValue(p.Input)
-		if didClip {
-			truncated = true
-			if m, ok := clipped.(map[string]any); ok {
-				p.Input = m
-			}
-		}
-		// Re-measure: per-string clipping bounds each value, not the total.
-		if encoded, err := json.Marshal(p.Input); err != nil || len(encoded) > broadcastInputLimit {
-			p.Input = nil
-			truncated = true
-		}
-	}
-
-	p.Truncated = truncated
-	return p
 }
 
 // ListTaskMessages returns the persisted messages for a task (for catch-up after reconnect).
@@ -5072,6 +5029,14 @@ func (h *Handler) BatchIssueGCCheck(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// ONE resolver for the whole batch, not a point lookup per row. The
+	// package-level Effective issues a GetIssueStatusEntryByKey for every custom
+	// key it sees, so resolving inside this loop cost up to maxIssueGCBatchSize
+	// catalog queries per request — on an endpoint whose entire purpose is to
+	// replace per-issue requests, and which every installed daemon runs on a
+	// timer. The resolver reads the catalog lazily and at most once, so an
+	// all-built-in batch still costs zero. (MUL-6243)
+	resolver := issuestatus.NewResolver(workspaceUUID)
 	items := make([]batchIssueGCCheckItem, 0, len(req.IssueIDs))
 	for i, issueID := range req.IssueIDs {
 		row, found := rows[canonicalIDs[i]]
@@ -5082,7 +5047,7 @@ func (h *Handler) BatchIssueGCCheck(w http.ResponseWriter, r *http.Request) {
 			// database of its own, so the canonical status is resolved here.
 			// Normalizing server-side also means daemons that predate custom
 			// statuses keep making correct GC decisions. (MUL-6243)
-			item.Status = issuestatus.Effective(r.Context(), h.Queries, workspaceUUID, row.Status)
+			item.Status = resolver.Effective(r.Context(), h.issueStatusCatalog(), row.Status)
 			updatedAt := row.UpdatedAt.Time
 			item.UpdatedAt = &updatedAt
 		}
@@ -5111,7 +5076,7 @@ func (h *Handler) GetIssueGCCheck(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		// Same reasoning as BatchIssueGCCheck: normalize server-side so the
 		// daemon's terminal-status test stays correct. (MUL-6243)
-		"status":     issuestatus.Effective(r.Context(), h.Queries, issue.WorkspaceID, issue.Status),
+		"status":     issuestatus.Effective(r.Context(), h.issueStatusCatalog(), issue.WorkspaceID, issue.Status),
 		"updated_at": issue.UpdatedAt.Time,
 	})
 }

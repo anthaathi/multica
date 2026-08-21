@@ -18,6 +18,7 @@ import (
 	obsmetrics "github.com/multica-ai/multica/server/internal/metrics"
 	"github.com/multica-ai/multica/server/internal/util"
 	db "github.com/multica-ai/multica/server/pkg/db/generated"
+	"github.com/multica-ai/multica/server/pkg/dbid"
 	"github.com/multica-ai/multica/server/pkg/protocol"
 )
 
@@ -304,6 +305,7 @@ func (s *IssueService) Create(ctx context.Context, p IssueCreateParams, opts Iss
 	var assignedTask db.AgentTaskQueue
 	if p.OriginType.Valid {
 		issue, err = qtx.CreateIssueWithOrigin(ctx, db.CreateIssueWithOriginParams{
+			ID:            dbid.NewV7(),
 			WorkspaceID:   p.WorkspaceID,
 			Title:         p.Title,
 			Description:   p.Description,
@@ -325,6 +327,7 @@ func (s *IssueService) Create(ctx context.Context, p IssueCreateParams, opts Iss
 		})
 	} else {
 		issue, err = qtx.CreateIssue(ctx, db.CreateIssueParams{
+			ID:            dbid.NewV7(),
 			WorkspaceID:   p.WorkspaceID,
 			Title:         p.Title,
 			Description:   p.Description,

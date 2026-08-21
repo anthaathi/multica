@@ -328,8 +328,7 @@ var ompBlockedArgs = map[string]blockedArgMode{
 //	--mode json                 emit one JSON event per line on stdout
 //	--session-dir <dir>         daemon-pinned session storage (always set)
 //	--resume <id>               resume an existing session (only when ResumeSessionID set)
-//	--provider <name>           provider, when Model is "provider/id"
-//	--model <id>                model identifier
+//	--model <selector>          model selector whole (provider/id or bare id; --provider never synthesized)
 //	--append-system-prompt <s>  extra system instructions
 //	--thinking <level>          reasoning effort (only when ThinkingLevel set)
 //
@@ -350,14 +349,16 @@ func buildOmpArgs(prompt, sessionDir string, opts ExecOptions, logger *slog.Logg
 	if opts.ResumeSessionID != "" {
 		args = append(args, "--resume", opts.ResumeSessionID)
 	}
-	if opts.Model != "" {
-		provider, model := splitPiModel(opts.Model)
-		if provider != "" {
-			args = append(args, "--provider", provider)
-		}
-		if model != "" {
-			args = append(args, "--model", model)
-		}
+	// The selector goes to --model whole, and --provider is never
+	// synthesized (same fix as Pi's GH #7300 / MUL-6471): omp's own
+	// resolver accepts every shape we hold — a canonical `provider/id`,
+	// a bare id, and an id that itself contains a slash (normal for
+	// gateway-style providers). Splitting on the first slash to fill
+	// --provider turns that id into a provider name omp has never heard
+	// of, and an unknown --provider is a hard error, whereas --model
+	// alone falls back to matching the full string as a raw model id.
+	if model := strings.TrimSpace(opts.Model); model != "" {
+		args = append(args, "--model", model)
 	}
 	if opts.SystemPrompt != "" {
 		args = append(args, "--append-system-prompt", opts.SystemPrompt)
