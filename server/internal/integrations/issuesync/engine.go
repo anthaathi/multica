@@ -17,6 +17,7 @@ import (
 	"github.com/multica-ai/multica/server/internal/service"
 	"github.com/multica-ai/multica/server/internal/util"
 	db "github.com/multica-ai/multica/server/pkg/db/generated"
+	"github.com/multica-ai/multica/server/pkg/dbid"
 	"github.com/multica-ai/multica/server/pkg/protocol"
 )
 
@@ -222,18 +223,18 @@ func (e *Engine) createLocalIssue(ctx context.Context, src db.IssueSyncSource, r
 		}
 	}
 	res, err := e.IssueService.Create(ctx, service.IssueCreateParams{
-		WorkspaceID:  src.WorkspaceID,
-		Title:        remote.Title,
-		Description:  util.StrToText(remote.Description),
-		Status:       status,
-		Priority:     "none",
-		AssigneeType: assigneeType,
-		AssigneeID:   assigneeID,
-		CreatorType:  "member",
-		CreatorID:    src.CreatedBy,
-		ProjectID:    src.ProjectID,
+		WorkspaceID:   src.WorkspaceID,
+		Title:         remote.Title,
+		Description:   util.StrToText(remote.Description),
+		Status:        status,
+		Priority:      "none",
+		AssigneeType:  assigneeType,
+		AssigneeID:    assigneeID,
+		CreatorType:   "member",
+		CreatorID:     src.CreatedBy,
+		ProjectID:     src.ProjectID,
 		ParentIssueID: parentIssueID,
-		OriginType:   util.StrToText("issue_sync"),
+		OriginType:    util.StrToText("issue_sync"),
 		// Backfill re-imports must not trip the duplicate guard on retry;
 		// idempotency comes from the link table, not the title.
 		AllowDuplicate: true,
@@ -321,6 +322,7 @@ func (e *Engine) applyRemoteComment(ctx context.Context, src db.IssueSyncSource,
 	// system comment precedent — remote authors have no Multica identity;
 	// attribution lives in the content prefix.
 	comment, err := e.Queries.CreateComment(ctx, db.CreateCommentParams{
+		ID:          dbid.NewV7(),
 		IssueID:     link.IssueID,
 		WorkspaceID: src.WorkspaceID,
 		AuthorType:  "system",
