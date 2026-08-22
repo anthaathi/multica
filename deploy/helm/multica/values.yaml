@@ -56,7 +56,7 @@ images:
 existingSecret: multica-secrets
 
 # -----------------------------------------------------------------------------
-# PostgreSQL (pgvector)
+# PostgreSQL
 # -----------------------------------------------------------------------------
 postgres:
   # Set external.enabled=true to skip the built-in postgres Deployment/PVC and
