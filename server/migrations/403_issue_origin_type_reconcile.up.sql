@@ -31,7 +31,10 @@
 -- 370-397: runtime_profile_add_dim renumbered the durable-work-dir
 -- collision to 376, dingtalk group-presence/bot-identity family,
 -- plugin-package publishing family, dispatch-reclaim indexes; none touch
--- issue.origin_type; sync 2026-08-21); runs last
+-- issue.origin_type; sync 2026-08-21), then 403 (upstream 398-402: issue
+-- workspace-status position index head-on collision at 398, plugin hook
+-- schedule family 399-402; none touch issue.origin_type; sync
+-- 2026-08-24); runs last
 -- so the union survives regardless of which same-prefix 149 migration ran.
 --
 -- This rebuild must carry every value added by earlier issue_origin_*

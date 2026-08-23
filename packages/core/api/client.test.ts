@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiClient, ApiError, CHAT_DRAFT_RESTORE_CAPABILITY, clientErrorMessage } from "./client";
-import { EMPTY_PLUGIN_PACKAGE_LIST, EMPTY_PLUGIN_PREVIEW, EMPTY_PLUGIN_SURFACE_SCRIPT } from "./schemas";
+import { EMPTY_PLUGIN_PACKAGE_LIST, EMPTY_PLUGIN_PREVIEW, EMPTY_PLUGIN_SURFACE_LAUNCH } from "./schemas";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -157,25 +157,23 @@ describe("ApiClient Plugin preview response schema", () => {
     )).resolves.toEqual(EMPTY_PLUGIN_PREVIEW);
   });
 
-  // A surface's code is what the host inlines into a sandboxed frame. A
-  // malformed response must fall back to an EMPTY script, which the frame
-  // renders as "could not load" — not to a partial one that runs.
-  it("falls back to an empty surface script when the response is malformed", async () => {
+  // A malformed launch must not become a partly trusted frame URL.
+  it("falls back to an empty surface launch when the response is malformed", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue(
-        new Response(JSON.stringify({ code: 42 }), {
+        new Response(JSON.stringify({ url: 42, bridge_token: "proof" }), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         }),
       ),
     );
 
-    await expect(new ApiClient("https://api.example.test").getPluginSurfaceScript(
+    await expect(new ApiClient("https://api.example.test").getPluginSurfaceLaunch(
       "workspace-1",
       "installation-1",
       "hello",
-    )).resolves.toEqual(EMPTY_PLUGIN_SURFACE_SCRIPT);
+    )).resolves.toEqual(EMPTY_PLUGIN_SURFACE_LAUNCH);
   });
 
   it("falls back to an empty package list when the response is malformed", async () => {
@@ -191,6 +189,53 @@ describe("ApiClient Plugin preview response schema", () => {
 
     await expect(new ApiClient("https://api.example.test").listPluginPackages("workspace-1"))
       .resolves.toEqual(EMPTY_PLUGIN_PACKAGE_LIST);
+  });
+});
+
+describe("ApiClient Plugin surface bridge routes", () => {
+  it("relays Action API calls through the session-only bridge prefix", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response("{}", { status: 200, headers: { "Content-Type": "application/json" } }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await new ApiClient("https://api.example.test").callPluginAction(
+      "installation-1",
+      { method: "GET", path: "/context", issueId: "MUL-42" },
+    );
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      "https://api.example.test/api/plugin-bridge/v1/context?issue_id=MUL-42",
+    );
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
+      method: "GET",
+      headers: expect.objectContaining({
+        "X-Multica-Plugin-Installation": "installation-1",
+      }),
+    });
+  });
+
+  it("invokes UI hooks through the session-only bridge prefix", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({
+        status: "ok",
+        hook_key: "summarize",
+        trigger: "ui",
+        latency_ms: 1,
+        attempts: 1,
+      }), { status: 200, headers: { "Content-Type": "application/json" } }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await new ApiClient("https://api.example.test").invokePluginHook(
+      "installation-1",
+      "summarize",
+      { trigger: "ui", issueId: "issue-1" },
+    );
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      "https://api.example.test/api/plugin-bridge/v1/hooks/summarize",
+    );
   });
 });
 
