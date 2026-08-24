@@ -32,9 +32,10 @@
 -- collision to 376, dingtalk group-presence/bot-identity family,
 -- plugin-package publishing family, dispatch-reclaim indexes; none touch
 -- issue.origin_type; sync 2026-08-21), then 403 (upstream 398-402: issue
--- workspace-status position index head-on collision at 398, plugin hook
 -- schedule family 399-402; none touch issue.origin_type; sync
--- 2026-08-24); runs last
+-- 2026-08-24), then 404 (upstream 403_runtime_profile_add_zeroclaw head-on
+-- collision at 403; it touches only runtime_profile, not issue.origin_type;
+-- sync 2026-08-25); runs last
 -- so the union survives regardless of which same-prefix 149 migration ran.
 --
 -- This rebuild must carry every value added by earlier issue_origin_*

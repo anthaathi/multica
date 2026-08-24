@@ -12,7 +12,7 @@
 
 Multica is an open-source workspace where you assign work to AI coding agents the way you'd
 assign it to a teammate — they pick up the issue, report progress, raise blockers, and hand it
-back for review. Self-hostable, works with 24 agent CLIs, no lock-in.
+back for review. Self-hostable, works with 25 agent CLIs, no lock-in.
 
 [![CI](https://github.com/multica-ai/multica/actions/workflows/ci.yml/badge.svg)](https://github.com/multica-ai/multica/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/multica-ai/multica?style=flat)](https://github.com/multica-ai/multica/releases)
@@ -53,7 +53,7 @@ issue — so nobody reconstructs context, and nothing ships without a human sayi
 
 *Claude Code, Codex, Cursor, Kimi — you don't pick one. You hire them all.*
 
-- **[24 agent CLIs](#runtimes) →** Claude Code, Codex, Cursor, Copilot, Kimi, OpenCode, and more.
+- **[25 agent CLIs](#runtimes) →** Claude Code, Codex, Cursor, Copilot, Kimi, OpenCode, and more.
 - **[Agents as teammates](https://multica.ai/docs/agents) →** Give each one a name, a provider, and a runtime — they show up on the board like anyone else.
 - **[Squads](https://multica.ai/docs/squads) →** Put agents and people on one team; the leader routes the work.
 - **[Skills](https://multica.ai/docs/skills) →** Turn a solved problem into a playbook every agent reuses.
@@ -134,7 +134,7 @@ cloud box. Desktop registers the computer it's running on automatically and dete
 CLIs installed there. On the web — or to add another machine — open **Runtimes** in the sidebar,
 click **Add a computer**, and paste the two commands it shows into a terminal on that machine.
 
-The daemon runs in the background and auto-detects agent CLIs (`claude`, `codex`, `codebuddy`, `copilot`, `opencode`, `openclaw`, `hermes`, `pi`, `cursor-agent`, `kimi`, `reasonix`, `kiro-cli`, `agy`, `qodercli`, `qoderclicn`, `traecli`, `omp`, `dim`) on your PATH.
+The daemon runs in the background and auto-detects agent CLIs (`claude`, `codex`, `codebuddy`, `copilot`, `opencode`, `openclaw`, `hermes`, `pi`, `cursor-agent`, `kimi`, `reasonix`, `kiro-cli`, `agy`, `qodercli`, `qoderclicn`, `traecli`, `omp`, `dim`, `zeroclaw`) on your PATH.
 **3. Create an agent.** Open **Agents** in the sidebar and click **New agent**. Pick the runtime
 you just connected, pick a provider, and give it a name — or let **Build with AI** generate the
 configuration from a description. That name is how it shows up on the board and in comments.
@@ -165,7 +165,7 @@ authenticated, so switching providers is a dropdown, not a migration.
 | Reasonix | `reasonix` | Trae CLI | `traecli` |
 | DeepSeek Harness | `dsh` | Oh-My-Pi | `omp` |
 | MiniMax Code | `mcode` | — | — |
-| Dim | `dim` | | |
+| Dim | `dim` | ZeroClaw | `zeroclaw` |
 
 Installing and authenticating them: [Install an agent runtime](https://multica.ai/docs/install-agent-runtime) ·
 [Providers](https://multica.ai/docs/providers)
@@ -206,7 +206,7 @@ Installing and authenticating them: [Install an agent runtime](https://multica.a
                              │  spawns
                       ┌──────┴───────────────────────────────┐
                       │  Claude Code · Codex · Cursor · …    │
-                      │  (any of the 24 runtimes above)      │
+                      │  (any of the 25 runtimes above)      │
                       └──────────────────────────────────────┘
 ```
 
@@ -217,7 +217,7 @@ Installing and authenticating them: [Install an agent runtime](https://multica.a
 | Mobile | Expo / React Native (iOS) |
 | Backend | Go (Chi router, sqlc, gorilla/websocket) |
 | Database | PostgreSQL 17 (`pgcrypto` + `pg_trgm`) |
-| Agent runtime | Local daemon executing any of the 24 agent CLIs above |
+| Agent runtime | Local daemon executing any of the 25 agent CLIs above |
 
 ---
 
