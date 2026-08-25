@@ -125,7 +125,7 @@ func (b *ompBackend) Execute(ctx context.Context, prompt string, opts ExecOption
 	}
 	cmd.Stderr = newLogWriter(b.cfg.Logger, "[omp:stderr] ")
 
-	if err := cmd.Start(); err != nil {
+	if err := startOwnedProcessTree(cmd, b.cfg.Logger); err != nil {
 		_ = stdin.Close()
 		cancel()
 		return nil, fmt.Errorf("start omp: %w", err)
@@ -270,7 +270,8 @@ func (b *ompBackend) Execute(ctx context.Context, prompt string, opts ExecOption
 			trySend(msgCh, Message{Type: MessageText, Content: d})
 		}
 
-		waitErr := cmd.Wait()
+	waitErr := cmd.Wait()
+	releaseProcessGroup(cmd)
 		duration := time.Since(startTime)
 
 		if runCtx.Err() == context.DeadlineExceeded {

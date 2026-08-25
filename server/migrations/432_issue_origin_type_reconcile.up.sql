@@ -35,7 +35,11 @@
 -- schedule family 399-402; none touch issue.origin_type; sync
 -- 2026-08-24), then 404 (upstream 403_runtime_profile_add_zeroclaw head-on
 -- collision at 403; it touches only runtime_profile, not issue.origin_type;
--- sync 2026-08-25); runs last
+-- sync 2026-08-25), then 432 (upstream 404-431: agent starter prompts
+-- (404 collided head-on), issue source-context family, seat-capacity outbox
+-- family, channel chat route generation/history, channel_task_delivery
+-- family, channel_outbound_message, chat explicit-origin backfill; none
+-- touch issue.origin_type; sync 2026-08-26); runs last
 -- so the union survives regardless of which same-prefix 149 migration ran.
 --
 -- This rebuild must carry every value added by earlier issue_origin_*

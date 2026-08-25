@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -62,9 +63,9 @@ const MinLocalWorktreeCLIVersion = "0.4.24"
 const MinHandoffCLIVersion = "0.3.28"
 
 // HandoffSupported reports whether a daemon reporting cliVersion is new enough
-// to render handoff notes. Reuses the shared semver parsing + git-describe
-// dev-build exemption but never errors — a missing/old/unparsable version
-// simply means "not supported", which the soft gate degrades gracefully.
+// to render handoff notes. Reuses the CheckMinCLIVersion parsing (including the
+// git-describe dev-build exemption) but never errors — a missing/old/unparsable
+// version simply means "not supported", which the soft gate degrades gracefully.
 func HandoffSupported(cliVersion string) bool {
 	d := strings.TrimSpace(cliVersion)
 	if d == "" {
@@ -84,6 +85,13 @@ func HandoffSupported(cliVersion string) bool {
 	return !parsed.lessThan(min)
 }
 
+// Errors returned by CheckMinCLIVersion. Callers branch on these to surface
+// "needs upgrade" vs "version not reported" with the right user message.
+var (
+	ErrCLIVersionMissing = errors.New("multica CLI version not reported by daemon")
+	ErrCLIVersionTooOld  = errors.New("multica CLI version is below required minimum")
+)
+
 // devDescribeRe matches the `git describe --tags --always --dirty` output for
 // a build past the latest tag, e.g. `v0.2.15-235-gdaf0e935` (optionally with a
 // trailing `-dirty`). Daemons built from source (Makefile `make build` / `make
@@ -91,6 +99,44 @@ func HandoffSupported(cliVersion string) bool {
 // described daemons as OK keeps `make daemon` unblocked without weakening the
 // gate for staging or production users running stale stable releases.
 var devDescribeRe = regexp.MustCompile(`^v?\d+\.\d+\.\d+-\d+-g[0-9a-fA-F]+`)
+
+// CheckMinCLIVersion returns nil when `detected` parses as ≥ minimum. Returns
+// ErrCLIVersionMissing for empty or unparsable input, and ErrCLIVersionTooOld
+// when parsable but below the minimum. The caller can check for these
+// sentinel errors with errors.Is to drive the response shape.
+//
+// Dev-built daemons (git-describe shape) always pass — the version string
+// itself is the shared signal, so the modal pre-check and this server gate
+// agree by construction without needing to compare separate env flags.
+func CheckMinCLIVersion(detected string) error {
+	return CheckMinCLIVersionFor(detected, MinQuickCreateCLIVersion)
+}
+
+// CheckMinCLIVersionFor applies the quick-create version policy against a
+// caller-provided capability floor. It preserves the dev-build exemption so
+// feature-specific server and frontend gates agree with the base gate.
+func CheckMinCLIVersionFor(detected, minimum string) error {
+	d := strings.TrimSpace(detected)
+	if d == "" {
+		return ErrCLIVersionMissing
+	}
+	if devDescribeRe.MatchString(d) {
+		return nil
+	}
+	parsed, err := parseSemver(d)
+	if err != nil {
+		return ErrCLIVersionMissing
+	}
+	min, err := parseSemver(minimum)
+	if err != nil {
+		// Misconfiguration in the constant itself — fail closed as missing.
+		return ErrCLIVersionMissing
+	}
+	if parsed.lessThan(min) {
+		return ErrCLIVersionTooOld
+	}
+	return nil
+}
 
 // semver holds a parsed semantic version (major.minor.patch).
 type semver struct {

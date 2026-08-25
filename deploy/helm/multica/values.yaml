@@ -29,6 +29,7 @@ images:
 #     --from-literal=GOOGLE_CLIENT_SECRET="" \
 #     --from-literal=CLOUDFRONT_PRIVATE_KEY="" \
 #     --from-literal=MULTICA_ENTITLEMENT_SERVICE_TOKEN="" \
+#     --from-literal=MULTICA_SUBSCRIPTION_CAPACITY_SERVICE_TOKEN="" \
 #     --from-literal=MULTICA_DEV_VERIFICATION_CODE="" \
 #     --from-literal=GITLAB_OAUTH_CLIENT_SECRET="" \
 #     --from-literal=MULTICA_GITLAB_SECRET_KEY="" \
@@ -44,6 +45,7 @@ images:
 #     --from-literal=GOOGLE_CLIENT_SECRET="" \
 #     --from-literal=CLOUDFRONT_PRIVATE_KEY="" \
 #     --from-literal=MULTICA_ENTITLEMENT_SERVICE_TOKEN="" \
+#     --from-literal=MULTICA_SUBSCRIPTION_CAPACITY_SERVICE_TOKEN="" \
 #     --from-literal=MULTICA_DEV_VERIFICATION_CODE="" \
 #     --from-literal=GITLAB_OAUTH_CLIENT_SECRET="" \
 #     --from-literal=MULTICA_GITLAB_SECRET_KEY="" \
@@ -156,6 +158,12 @@ backend:
       staleGrace: 15m
       # Local down switch applied by the next chart rollout; it only forces off.
       emergencyDisabled: false
+    # Managed Cloud seat-capacity executor. Keep off for self-hosting. When
+    # enabled, put the matching service token in existingSecret.
+    subscriptionCapacity:
+      enabled: false
+      url: ""
+      timeout: 3s
     googleClientId: ""
     googleRedirectUri: http://multica.dev.lan/auth/callback
     # Public origin of the API as reached from the internet (no trailing
@@ -258,4 +266,7 @@ monitoring:
     additionalLabels: {}
     samplerQueryErrorsFor: 5m
     samplerQueryLatencyFor: 10m
+    seatCapacityDeadLetteredFor: 5m
+    seatCapacityPendingAgeSeconds: 900
+    seatCapacityPendingFor: 5m
     severity: warning
