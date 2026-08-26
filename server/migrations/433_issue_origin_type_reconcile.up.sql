@@ -39,8 +39,11 @@
 -- (404 collided head-on), issue source-context family, seat-capacity outbox
 -- family, channel chat route generation/history, channel_task_delivery
 -- family, channel_outbound_message, chat explicit-origin backfill; none
--- touch issue.origin_type; sync 2026-08-26); runs last
--- so the union survives regardless of which same-prefix 149 migration ran.
+-- touch issue.origin_type; sync 2026-08-26), then 433 (upstream
+-- 432_agent_conversation_starters_rename collided head-on; it renames the
+-- agent.starter_prompts column, not issue.origin_type; sync 2026-08-27);
+-- runs last so the union survives regardless of which same-prefix 149
+-- migration ran.
 --
 -- This rebuild must carry every value added by earlier issue_origin_*
 -- migrations, including upstream's 'wecom_chat' (263) and 'telegram_chat'

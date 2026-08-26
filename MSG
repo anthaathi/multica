@@ -1,0 +1,28 @@
+Merge upstream/main into fork (sync 2026-08-27)
+
+Upstream changes (20 commits):
+- MUL-6709: rename starter_prompts to conversation_starters (agent column,
+  API, core/views, migration 432) + v0.4.35 changelog
+- MUL-6698: conversation starters discoverable from the chat they run in
+- MUL-6697: enforce runtime access on task claims
+- MUL-6686: readable workdir paths for daemon
+- MUL-6639: metadata-only skill listings + stall-based timeouts
+- MUL-6634: bound board description previews
+- MUL-6141: price Qwen/Kimi/Ark models, strip ':' provider prefixes
+- Cloud refactor: single URL-only cloud connection replaces
+  entitlementPolicy/subscriptionCapacity blocks (helm values restructure)
+- Billing: automatic Cloud seat enforcement, trusted Pro limits
+- Reverts: MUL-6016 Codex capacity retry, MUL-6385 live HTML preview
+- fixes: autopilot assign private agents, codex turn completion,
+  obsolete autopilot priority flag, landing hero preload
+
+Fork resolution:
+- values.yaml: union secret-literal comments; drop dead
+  MULTICA_ENTITLEMENT/SUBSCRIPTION_CAPACITY_SERVICE_TOKEN lines (server
+  now reads only MULTICA_CLOUD_URL)
+- Renumber issue_origin_type_reconcile 432 -> 433 (upstream claimed 432
+  for the conversation_starters rename; it does not touch origin_type)
+
+Verified: go build/vet, sqlc regen (zero drift), migrations through 433
+(reconcile last), pkg/agent + handler (DB-backed) + dbid tests,
+typecheck (core/views/web/desktop). Locale deletion audit clean.
