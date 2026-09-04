@@ -441,3 +441,4 @@ func TestDiscoverOmpModelsMissingBinary(t *testing.T) {
 		t.Fatalf("expected 0 models for missing binary, got %d", len(models))
 	}
 }
+
