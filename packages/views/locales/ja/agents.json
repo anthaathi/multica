@@ -718,6 +718,7 @@
   },
   "transcript": {
     "dialog_title": "エージェント実行トランスクリプト",
+    "timeline": "タイムライン",
     "status_running": "実行中",
     "status_completed": "完了",
     "status_failed": "失敗",

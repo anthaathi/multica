@@ -730,6 +730,7 @@ function TimelineBar({
   selectedKey: string | null;
   onSelect: (key: string) => void;
 }) {
+  const { t } = useT("agents");
   const segments: { startIndex: number; count: number; color: NodeColor; keys: string[] }[] = [];
   let current: NodeColor | null = null;
   let start = 0;
@@ -757,7 +758,7 @@ function TimelineBar({
     <div
       className="flex h-5 gap-0.5 overflow-hidden rounded"
       role="navigation"
-      aria-label="Timeline"
+      aria-label={t(($) => $.transcript.timeline)}
     >
       {segments.map((seg) => {
         const c = SEGMENT_COLORS[seg.color];

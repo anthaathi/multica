@@ -246,7 +246,7 @@ describe("AgentTranscriptDialog — ChatGPT-style conversation", () => {
 
     expect(
       await screen.findByText(
-        "Antigravity does not currently provide live execution events. The transcript will be available after the task completes.",
+        "Antigravity does not currently provide live execution events. The transcript will be available after the run completes.",
       ),
     ).toBeInTheDocument();
     expect(screen.queryByText("Waiting for events...")).not.toBeInTheDocument();
