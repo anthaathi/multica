@@ -45,7 +45,10 @@
 -- then 451 (upstream 434-450: runtime last-seen index family 437-439,
 -- 441_runtime_profile_add_codearts, autopilot quota notified-at 448,
 -- autopilot_trigger_created_by 449; none touch issue.origin_type; sync
--- 2026-09-05);
+-- 2026-09-05), then 457 (upstream 451-456: agent task comment-thread family
+-- 451-453 (451_agent_task_comment_thread collided head-on), comment search
+-- index drops 454/455, 456_cancel_comment_assignee_fallbacks; none touch
+-- issue.origin_type; sync 2026-09-09);
 -- runs last so the union survives regardless of which same-prefix 149
 -- migration ran.
 --

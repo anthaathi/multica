@@ -197,7 +197,7 @@ Installing and authenticating them: [Install an agent runtime](https://multica.a
                           ▼
    ┌──────────────┐   ┌──────────────┐   ┌──────────────────┐
    │   Next.js    │──>│  Go backend  │──>│   PostgreSQL     │
-   │   frontend   │<──│  (Chi + WS)  │<──│   (pgvector)     │
+   │   frontend   │<──│  (Chi + WS)  │<──│   (17)           │
    └──────────────┘   └──────┬───────┘   └──────────────────┘
                              │  tasks over WebSocket
                       ┌──────┴───────┐

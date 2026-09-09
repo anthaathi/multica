@@ -51,6 +51,19 @@ import {
   type ConversationNode,
 } from "./conversation";
 import {
+  base64ByteLength,
+  readImageResult,
+  traceEventDetail,
+} from "./trace-event-presenter";
+import {
+  DiffDetailSurface,
+  PatchDetailSurface,
+  FileWriteSurface,
+  ToolDetailSurface,
+} from "./detail-surfaces";
+import { redactSecrets } from "./redact";
+import { languageForPath } from "./diff-highlight";
+import {
   AssistantMessage,
   ErrorMessage,
   ThinkingMessage,
@@ -67,6 +80,15 @@ interface AgentTranscriptDialogProps {
   items: TimelineItem[];
   agentName: string;
   isLive?: boolean;
+  /**
+   * Whether focus returns to the trigger when the dialog closes. Pass `true`
+   * only for a keyboard open, where the reader has no other way back. After a
+   * pointer open, returning focus is what leaves the trigger wearing a focus
+   * ring and its tooltip once Esc closes the log.
+   */
+  finalFocus?: boolean;
+  /** Loading/error content while the caller retrieves the transcript. */
+  contentState?: React.ReactNode;
   /**
    * Optional content rendered between the header chips and the event list.
    * Used by autopilot run rows to surface the inbound webhook trigger
@@ -155,6 +177,8 @@ export function AgentTranscriptDialog({
   items,
   agentName,
   isLive = false,
+  finalFocus = false,
+  contentState,
   headerSlot,
 }: AgentTranscriptDialogProps) {
   const { t } = useT("agents");
@@ -412,6 +436,7 @@ export function AgentTranscriptDialog({
       <DialogContent
         className="!max-w-4xl !w-[calc(100vw-4rem)] !max-h-[calc(100vh-4rem)] !h-[calc(100vh-4rem)] flex flex-col !p-0 !gap-0 overflow-hidden"
         showCloseButton={false}
+        finalFocus={finalFocus}
       >
         <DialogTitle className="sr-only">{t(($) => $.transcript.dialog_title)}</DialogTitle>
 
@@ -625,7 +650,9 @@ export function AgentTranscriptDialog({
         )}
 
         {/* ── Conversation list ─────────────────────────────────── */}
-        {displayNodes.length === 0 ? (
+        {contentState ? (
+          <div className="flex flex-1 items-center justify-center p-4">{contentState}</div>
+        ) : displayNodes.length === 0 ? (
           <div className="flex flex-1 items-center justify-center text-body text-muted-foreground">
             {isAntigravityLiveEmpty ? (
               <div className="flex max-w-md items-center gap-2 px-4 text-center">
@@ -874,4 +901,62 @@ function formatProvider(provider: string): string {
     "claude-code": "Claude Code",
   };
   return map[provider] ?? provider;
+}
+
+// ─── Step body (shared with the inline comment-run renderer) ───────────────
+// Ported from upstream's dialog so issues/components/inline-comment-run.tsx
+// can render one trace item's payload inline; the fork's conversation-list
+// dialog itself keeps its own node renderer above.
+
+/** One payload, rendered as what it is. */
+export function StepBody({ item }: { item: TimelineItem }) {
+  const { t } = useT("agents");
+  const detail = useMemo(() => traceEventDetail(item), [item]);
+  const image = useMemo(() => readImageResult(item.output), [item.output]);
+
+  // A screenshot is a picture, not a 200KB base64 string in a <pre>.
+  if (image) {
+    return (
+      <figure className="px-2 py-1">
+        <img
+          src={`data:${image.mediaType};base64,${image.base64}`}
+          alt={t(($) => $.transcript.image_result)}
+          className="max-h-80 w-full rounded-md border object-contain"
+        />
+        <figcaption className="pt-1 text-micro text-faint-foreground">
+          {t(($) => $.transcript.image_result)} · {formatBytes(base64ByteLength(image.base64))}
+        </figcaption>
+      </figure>
+    );
+  }
+
+  switch (detail.kind) {
+    case "diff":
+      return <DiffDetailSurface lines={detail.lines} path={detail.path} />;
+    case "patch":
+      return <PatchDetailSurface files={detail.files} truncated={detail.truncated} />;
+    case "file":
+      return (
+        <FileWriteSurface text={detail.text} lineCount={detail.lineCount} path={detail.path} />
+      );
+    default: {
+      const text = detail.text;
+      const clipped =
+        text.length > 8000 ? `${redactSecrets(text.slice(0, 8000))}\n... (truncated)` : redactSecrets(text);
+      const path = item.type === "tool_use" ? readPathFromInput(item.input) : undefined;
+      return <ToolDetailSurface text={clipped} language={path ? languageForPath(path) : undefined} />;
+    }
+  }
+}
+
+function readPathFromInput(input: Record<string, unknown> | undefined): string | undefined {
+  if (!input) return undefined;
+  const path = input.file_path ?? input.path;
+  return typeof path === "string" ? path : undefined;
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }

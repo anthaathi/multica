@@ -1,10 +1,11 @@
 import { DingTalkMark } from "./dingtalk-mark";
 import { LarkMark } from "./lark-mark";
 import { SlackMark } from "./slack-mark";
+import { MattermostMark } from "./mattermost-mark";
 import { TelegramMark } from "./telegram-mark";
 import { WecomMark } from "./wecom-mark";
 
-type IntegrationChannel = "lark" | "slack" | "dingtalk" | "wecom" | "telegram";
+type IntegrationChannel = "lark" | "slack" | "mattermost" | "dingtalk" | "wecom" | "telegram";
 
 // Every channel gets its own brand mark, never a generic lucide glyph: the icon
 // is what tells a reader which platform the section belongs to, and a stand-in
@@ -15,6 +16,7 @@ export function IntegrationChannelIcon({ channel }: { channel: IntegrationChanne
   const icon = {
     lark: <LarkMark className="h-4 w-4" />,
     slack: <SlackMark className="h-4 w-4" />,
+    mattermost: <MattermostMark className="h-4 w-4" />,
     dingtalk: <DingTalkMark className="h-5 w-5" />,
     wecom: <WecomMark className="h-4 w-4" />,
     telegram: <TelegramMark className="h-4 w-4" />,
