@@ -22,6 +22,7 @@ const mockViewport = vi.hoisted(() => ({ isMobile: false }));
 // Counts MockContentEditor mounts. This pins the description to exactly one
 // eager editor per issue and catches stale editor reuse across issue switches.
 const contentEditorMounts = vi.hoisted(() => ({ count: 0 }));
+const descriptionSelectionAction = vi.hoisted(() => ({ current: undefined as { label: string; onSelect: () => void } | undefined }));
 // Stable empty-attachments reference: the real store returns a shared constant
 // so the `useCommentDraftStore(s => s.getAttachments(key))` selector keeps a
 // stable identity. A fresh `[]` per call would loop useSyncExternalStore.
@@ -177,10 +178,12 @@ vi.mock("../../editor", async () => ({
       placeholder,
       flushPendingOnUnmount,
       onReady,
+      selectionAction,
     }: any,
     ref: any,
   ) {
     const initialValue = syncedValue ?? defaultValue ?? "";
+    if (syncedValue !== undefined) descriptionSelectionAction.current = selectionAction;
     const valueRef = useRef(initialValue);
     const baseRef = useRef(initialValue);
     const [editorValue, setEditorValue] = useState(initialValue);
@@ -406,6 +409,7 @@ vi.mock("@multica/core/issues/stores", async () => ({
       const state = {
         drafts: {} as Record<string, { content: string; attachments: unknown[]; updatedAt: number }>,
         getDraft: () => undefined,
+        getAnnotations: () => emptyDraftAttachments,
         getAttachments: () => emptyDraftAttachments,
         getUploads: () => emptyDraftAttachments,
         setDraft: () => {},
@@ -422,6 +426,7 @@ vi.mock("@multica/core/issues/stores", async () => ({
       getState: () => ({
         drafts: {} as Record<string, { content: string; attachments: unknown[]; updatedAt: number }>,
         getDraft: () => undefined,
+        getAnnotations: () => emptyDraftAttachments,
         getAttachments: () => emptyDraftAttachments,
         getUploads: () => emptyDraftAttachments,
         setDraft: () => {},
@@ -692,6 +697,7 @@ describe("IssueDetail (shared)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     contentEditorMounts.count = 0;
+    descriptionSelectionAction.current = undefined;
     mockViewport.isMobile = false;
     // Default: issue loads successfully
     mockApiObj.getIssue.mockResolvedValue(mockIssue);
@@ -808,6 +814,13 @@ describe("IssueDetail (shared)", () => {
     expect(skeletonGutters).toEqual(
       horizontalGutters(container.querySelector(".max-w-4xl")),
     );
+  });
+
+  it("wires the description selection toolbar to annotation collection", async () => {
+    renderIssueDetail();
+    await screen.findByDisplayValue("Add JWT auth to the backend");
+    expect(descriptionSelectionAction.current?.label).toBe("Add to comment");
+    expect(descriptionSelectionAction.current?.onSelect).toBeTypeOf("function");
   });
 
   it("renders issue title and description after loading", async () => {
@@ -2888,6 +2901,40 @@ describe("IssueDetail (shared)", () => {
       );
     });
   });
+
+  // MUL-7211 regression: a standalone run's published reply belongs at the
+  // reply's own time. It used to render in the run's ENQUEUE slot while the
+  // card showed the reply time, pushing it above every comment written while
+  // the run worked. Ordering matrix lives in comment-runs.test.ts.
+  it("renders an assignment run's reply after the comments it followed", async () => {
+    mockApiObj.listTimeline.mockResolvedValue([
+      {
+        type: "comment", id: "midway", actor_type: "member", actor_id: "user-1",
+        content: "Remember the E2E pass", parent_id: null,
+        created_at: "2026-01-17T00:00:00Z", updated_at: "2026-01-17T00:00:00Z", comment_type: "comment",
+      },
+      {
+        type: "comment", id: "run-reply", actor_type: "agent", actor_id: "agent-1",
+        content: "step1 done", parent_id: null, source_task_id: "task-early",
+        created_at: "2026-01-18T00:00:00Z", updated_at: "2026-01-18T00:00:00Z", comment_type: "comment",
+      },
+    ]);
+    mockApiObj.listTasksByIssue.mockResolvedValue([{
+      id: "task-early", agent_id: "agent-1", runtime_id: "rt-1", issue_id: "issue-1",
+      kind: "issue", status: "completed", priority: 0,
+      dispatched_at: "2026-01-16T00:00:00Z", started_at: "2026-01-16T00:00:00Z",
+      completed_at: "2026-01-18T00:00:00Z", result: { comment: "step1 done" }, error: null,
+      created_at: "2026-01-16T00:00:00Z", delivered_comment_ids: [],
+    }]);
+
+    const { container } = renderIssueDetail();
+    await screen.findByText("Remember the E2E pass");
+    await screen.findByText("step1 done");
+
+    const rendered = Array.from(container.querySelectorAll("[id^='comment-']")).map((el) => el.id);
+    expect(rendered.indexOf("comment-midway")).toBeLessThan(rendered.indexOf("comment-run-reply"));
+  });
+
 });
 
 describe("groupSubIssuesByStage", () => {

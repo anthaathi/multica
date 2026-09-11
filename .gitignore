@@ -79,3 +79,4 @@ deploy.md
 # Python (agent tooling)
 __pycache__/
 *.pyc
+perf-report/

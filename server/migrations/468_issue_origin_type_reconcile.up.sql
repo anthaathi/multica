@@ -48,7 +48,12 @@
 -- 2026-09-05), then 457 (upstream 451-456: agent task comment-thread family
 -- 451-453 (451_agent_task_comment_thread collided head-on), comment search
 -- index drops 454/455, 456_cancel_comment_assignee_fallbacks; none touch
--- issue.origin_type; sync 2026-09-09);
+-- issue.origin_type; sync 2026-09-09), then 468 (upstream 457-467:
+-- 457_task_message_output_truncated collided head-on, cancellation actor
+-- backfill 458, chat/task-queue index family 459/460/465/466,
+-- channel_trigger_snapshot 461, reference-only PR link removal 462,
+-- issue description index drops 463/464, autopilot trigger creator
+-- backfill 467; none touch issue.origin_type; sync 2026-09-12);
 -- runs last so the union survives regardless of which same-prefix 149
 -- migration ran.
 --

@@ -8969,6 +8969,8 @@ func (d *Daemon) executeAndDrain(ctx context.Context, backend agent.Backend, pro
 		var mu sync.Mutex
 		var pendingText strings.Builder
 		var pendingThinking strings.Builder
+		var pendingTextAt time.Time
+		var pendingThinkingAt time.Time
 		var batch []TaskMessageData
 		callIDToTool := map[string]string{}
 
@@ -8977,20 +8979,24 @@ func (d *Daemon) executeAndDrain(ctx context.Context, backend agent.Backend, pro
 			if pendingThinking.Len() > 0 {
 				s := msgSeq.Add(1)
 				batch = append(batch, TaskMessageData{
-					Seq:     int(s),
-					Type:    "thinking",
-					Content: pendingThinking.String(),
+					Seq:       int(s),
+					Type:      "thinking",
+					Content:   pendingThinking.String(),
+					CreatedAt: pendingThinkingAt,
 				})
 				pendingThinking.Reset()
+				pendingThinkingAt = time.Time{}
 			}
 			if pendingText.Len() > 0 {
 				s := msgSeq.Add(1)
 				batch = append(batch, TaskMessageData{
-					Seq:     int(s),
-					Type:    "text",
-					Content: pendingText.String(),
+					Seq:       int(s),
+					Type:      "text",
+					Content:   pendingText.String(),
+					CreatedAt: pendingTextAt,
 				})
 				pendingText.Reset()
+				pendingTextAt = time.Time{}
 			}
 			toSend := batch
 			batch = nil
@@ -9042,7 +9048,8 @@ func (d *Daemon) executeAndDrain(ctx context.Context, backend agent.Backend, pro
 				// gone silent — stamping before processing makes sure a
 				// slow downstream call (mu.Lock contention, batch resize)
 				// can't be misattributed to backend silence.
-				lastActivityAt.Store(time.Now().UnixNano())
+				observedAt := time.Now().UTC()
+				lastActivityAt.Store(observedAt.UnixNano())
 				switch msg.Type {
 				case agent.MessageStatus:
 					// Persist the session/work_dir as soon as the backend
@@ -9089,9 +9096,10 @@ func (d *Daemon) executeAndDrain(ctx context.Context, backend agent.Backend, pro
 					s := msgSeq.Add(1)
 					mu.Lock()
 					batch = append(batch, TaskMessageData{
-						Seq:  int(s),
-						Type: "tool_use",
-						Tool: msg.Tool,
+						Seq:       int(s),
+						Type:      "tool_use",
+						Tool:      msg.Tool,
+						CreatedAt: observedAt,
 						// Redact before the payload leaves this process, not
 						// only on arrival. The server redacts again in its
 						// ingest handler, but that is the *remote* side: a
@@ -9120,7 +9128,7 @@ func (d *Daemon) executeAndDrain(ctx context.Context, backend agent.Backend, pro
 						}
 					}
 					s := msgSeq.Add(1)
-					output := toolOutputPreview(msg.Output)
+					output, outputTruncated := toolOutputPreview(msg.Output)
 					toolName := msg.Tool
 					if toolName == "" && msg.CallID != "" {
 						mu.Lock()
@@ -9130,16 +9138,25 @@ func (d *Daemon) executeAndDrain(ctx context.Context, backend agent.Backend, pro
 					taskLog.Info("tool_result observed", "seq", s, "tool", toolName, "call_id", msg.CallID)
 					mu.Lock()
 					batch = append(batch, TaskMessageData{
-						Seq:    int(s),
-						Type:   "tool_result",
-						Tool:   toolName,
-						Output: output,
+						Seq:       int(s),
+						Type:      "tool_result",
+						Tool:      toolName,
+						Output:    output,
+						CreatedAt: observedAt,
+						// Always sent, including false: the reader has to be
+						// able to tell "this record is complete" from "this
+						// record predates the flag", and only a daemon that
+						// measured the output can say the former.
+						OutputTruncated: &outputTruncated,
 					})
 					mu.Unlock()
 				case agent.MessageThinking:
 					if msg.Content != "" {
 						mu.Lock()
 						pendingThinking.WriteString(msg.Content)
+						if pendingThinkingAt.IsZero() {
+							pendingThinkingAt = observedAt
+						}
 						mu.Unlock()
 					}
 				case agent.MessageText:
@@ -9147,6 +9164,9 @@ func (d *Daemon) executeAndDrain(ctx context.Context, backend agent.Backend, pro
 						taskLog.Debug("agent", "text", truncateLog(msg.Content, 200))
 						mu.Lock()
 						pendingText.WriteString(msg.Content)
+						if pendingTextAt.IsZero() {
+							pendingTextAt = observedAt
+						}
 						mu.Unlock()
 					}
 				case agent.MessageError:
@@ -9154,9 +9174,10 @@ func (d *Daemon) executeAndDrain(ctx context.Context, backend agent.Backend, pro
 					s := msgSeq.Add(1)
 					mu.Lock()
 					batch = append(batch, TaskMessageData{
-						Seq:     int(s),
-						Type:    "error",
-						Content: msg.Content,
+						Seq:       int(s),
+						Type:      "error",
+						Content:   msg.Content,
+						CreatedAt: observedAt,
 					})
 					mu.Unlock()
 				}
