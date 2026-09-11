@@ -102,7 +102,7 @@ export function MattermostTab() {
             <p className="text-body font-medium">{t(($) => $.mattermost.not_enabled_title)}</p>
             <p className="text-caption text-muted-foreground">
               {t(($) => $.mattermost.not_enabled_description_prefix)}{" "}
-              <code className="rounded bg-muted px-1 py-0.5 text-micro">
+              <code className="rounded-xs bg-muted px-1 py-0.5 text-micro">
                 MULTICA_MATTERMOST_SECRET_KEY
               </code>{" "}
               {t(($) => $.mattermost.not_enabled_description_suffix)}{" "}
@@ -214,7 +214,7 @@ function InstallationRow({
           <p className="text-body font-medium">
             {agentName}
             {!isActive && (
-              <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-micro text-muted-foreground">
+              <span className="ml-2 rounded-xs bg-muted px-1.5 py-0.5 text-micro text-muted-foreground">
                 {t(($) => $.mattermost.revoked_badge)}
               </span>
             )}

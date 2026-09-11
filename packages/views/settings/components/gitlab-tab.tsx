@@ -337,7 +337,7 @@ function WebhookField({
     <div className="space-y-1">
       <Label className="text-caption text-muted-foreground">{label}</Label>
       <div className="flex items-center gap-2">
-        <code className="flex-1 truncate rounded bg-muted px-2 py-1 text-micro">{value}</code>
+        <code className="flex-1 truncate rounded-xs bg-muted px-2 py-1 text-micro">{value}</code>
         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onCopy(value)}>
           <Copy className="h-3.5 w-3.5" />
         </Button>

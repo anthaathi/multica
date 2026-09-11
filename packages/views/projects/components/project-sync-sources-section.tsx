@@ -102,7 +102,7 @@ export function ProjectSyncSourcesSection({ projectId }: { projectId: string }) 
       <div className="flex items-center justify-between">
         <button
           type="button"
-          className="-ml-2 flex w-full items-center gap-1 rounded px-2 py-0.5 text-caption font-medium text-muted-foreground hover:text-foreground"
+          className="-ml-2 flex w-full items-center gap-1 rounded-xs px-2 py-0.5 text-caption font-medium text-muted-foreground hover:text-foreground"
         >
           {t(($) => $.sync_sources.section_title)}
         </button>

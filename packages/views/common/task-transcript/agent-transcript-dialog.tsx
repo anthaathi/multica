@@ -469,7 +469,7 @@ export function AgentTranscriptDialog({
                       ? t(($) => $.transcript.collapse_visible)
                       : t(($) => $.transcript.expand_visible)
                   }
-                  className="flex shrink-0 items-center gap-1 rounded px-2 py-1 text-caption text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  className="flex shrink-0 items-center gap-1 rounded-xs px-2 py-1 text-caption text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                 >
                   {allExpanded
                     ? t(($) => $.transcript.collapse_visible)
@@ -492,7 +492,7 @@ export function AgentTranscriptDialog({
                   <DropdownMenuTrigger
                     aria-label={t(($) => $.transcript.filter)}
                     className={cn(
-                      "flex shrink-0 items-center gap-1 rounded px-2 py-1 text-caption transition-colors",
+                      "flex shrink-0 items-center gap-1 rounded-xs px-2 py-1 text-caption transition-colors",
                       activeFilterKeys.length > 0
                         ? "text-blue-600 dark:text-blue-400 bg-blue-500/10 hover:bg-blue-500/20"
                         : "text-muted-foreground hover:text-foreground hover:bg-accent",
@@ -544,7 +544,7 @@ export function AgentTranscriptDialog({
                 type="button"
                 onClick={handleCopyAll}
                 aria-label={copyTranscriptLabel}
-                className="flex shrink-0 items-center gap-1 rounded px-2 py-1 text-caption text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                className="flex shrink-0 items-center gap-1 rounded-xs px-2 py-1 text-caption text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
               >
                 {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                 <span className="hidden sm:inline">{copyTranscriptLabel}</span>
@@ -552,7 +552,7 @@ export function AgentTranscriptDialog({
               <button
                 type="button"
                 onClick={() => onOpenChange(false)}
-                className="flex shrink-0 items-center justify-center rounded p-1 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                className="flex shrink-0 items-center justify-center rounded-xs p-1 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -783,7 +783,7 @@ function TimelineBar({
 
   return (
     <div
-      className="flex h-5 gap-0.5 overflow-hidden rounded"
+      className="flex h-5 gap-0.5 overflow-hidden rounded-xs"
       role="navigation"
       aria-label={t(($) => $.transcript.timeline)}
     >
@@ -830,7 +830,7 @@ function SortDirectionToggle({ value, onChange, labels }: SortDirectionTogglePro
     <div
       role="group"
       aria-label={labels.ariaLabel}
-      className="flex shrink-0 items-center rounded border bg-background p-0.5"
+      className="flex shrink-0 items-center rounded-xs border bg-background p-0.5"
     >
       <ToggleBtn
         active={isChrono}
@@ -866,7 +866,7 @@ function ToggleBtn({
       aria-pressed={active}
       title={label}
       className={cn(
-        "flex items-center gap-1 rounded px-1.5 py-0.5 text-caption transition-colors",
+        "flex items-center gap-1 rounded-xs px-1.5 py-0.5 text-caption transition-colors",
         active
           ? "bg-accent text-foreground"
           : "text-muted-foreground hover:text-foreground",

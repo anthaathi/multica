@@ -93,7 +93,7 @@ function CopyChip({ getText, label }: { getText: () => string; label: string }) 
       }}
       aria-label={label}
       title={label}
-      className="flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-micro text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+      className="flex shrink-0 items-center gap-1 rounded-xs px-1.5 py-0.5 text-micro text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
     >
       {copied ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3" />}
     </button>
@@ -277,7 +277,7 @@ export const ToolNodeCard = memo(function ToolNodeCard({ node, expanded, onExpan
         render={
           <Marker
             role={undefined}
-            className="w-full rounded px-1 -mx-1 py-1 transition-colors hover:bg-accent/40 data-[state=open]:bg-accent/30"
+            className="w-full rounded-xs px-1 -mx-1 py-1 transition-colors hover:bg-accent/40 data-[state=open]:bg-accent/30"
           />
         }
       >
@@ -288,7 +288,7 @@ export const ToolNodeCard = memo(function ToolNodeCard({ node, expanded, onExpan
           <ChevronRight className={cn("size-3 shrink-0 text-faint-foreground transition-transform", expanded && "rotate-90")} />
           <span className="shrink-0 font-medium text-foreground">{verb}</span>
           {code && (
-            <code className="min-w-0 truncate rounded bg-muted px-1 py-0.5 font-mono text-micro text-muted-foreground">{code}</code>
+            <code className="min-w-0 truncate rounded-xs bg-muted px-1 py-0.5 font-mono text-micro text-muted-foreground">{code}</code>
           )}
         </MarkerContent>
       </CollapsibleTrigger>
@@ -320,7 +320,7 @@ export function ThinkingMessage({ item }: { item: TimelineItem }) {
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
       <CollapsibleTrigger
-        render={<Marker className="w-full rounded px-1 -mx-1 py-1 transition-colors hover:bg-accent/40 data-[state=open]:bg-accent/30" />}
+        render={<Marker className="w-full rounded-xs px-1 -mx-1 py-1 transition-colors hover:bg-accent/40 data-[state=open]:bg-accent/30" />}
       >
         <MarkerIcon>
           <Brain className="size-3.5 text-violet-500/70" />
