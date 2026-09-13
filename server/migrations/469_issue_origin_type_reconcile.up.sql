@@ -53,7 +53,10 @@
 -- backfill 458, chat/task-queue index family 459/460/465/466,
 -- channel_trigger_snapshot 461, reference-only PR link removal 462,
 -- issue description index drops 463/464, autopilot trigger creator
--- backfill 467; none touch issue.origin_type; sync 2026-09-12);
+-- backfill 467; none touch issue.origin_type; sync 2026-09-12), then 469
+-- (upstream 468_comment_deleted_at and 468_drop_reference_only_column
+-- collided head-on — upstream's own internal duplicate pair from PRs #8323
+-- and #8253; neither touches issue.origin_type; sync 2026-09-14);
 -- runs last so the union survives regardless of which same-prefix 149
 -- migration ran.
 --

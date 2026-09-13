@@ -60,6 +60,13 @@ var legacyDuplicateMigrationStems = map[string][]string{
 	"137": {"137_activity_log_issue_sync_actor", "137_search_index_pg_trgm_extension"},
 	"143": {"143_agent_task_queue_chat_pending_v2", "143_runtime_profile_add_omp"},
 	"149": {"149_issue_origin_agent_create", "149_issue_origin_mattermost_chat"},
+	// Upstream's own two PRs #8323 (MUL-7282) and #8253 (MUL-7072) each
+	// claimed 468 in isolation and merged without noticing the collision
+	// (their per-branch CI never saw both). We cannot renumber upstream's
+	// files without diverging from them every future sync, so the pair is
+	// registered here instead. The exact-stem match below fails loudly the
+	// moment upstream renumbers one of them — remove this entry then.
+	"468": {"468_comment_deleted_at", "468_drop_reference_only_column"},
 }
 
 var migrationPrefixPattern = regexp.MustCompile(`^(\d+)_`)
