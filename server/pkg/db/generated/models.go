@@ -562,6 +562,7 @@ type Comment struct {
 	ViaPluginID       pgtype.UUID        `json:"via_plugin_id"`
 	Revision          int64              `json:"revision"`
 	RecoverySettledAt pgtype.Timestamptz `json:"recovery_settled_at"`
+	DeletedAt         pgtype.Timestamptz `json:"deleted_at"`
 }
 
 type CommentReaction struct {
@@ -944,7 +945,6 @@ type IssuePullRequest struct {
 	LinkedByID    pgtype.UUID        `json:"linked_by_id"`
 	LinkedAt      pgtype.Timestamptz `json:"linked_at"`
 	CloseIntent   bool               `json:"close_intent"`
-	ReferenceOnly bool               `json:"reference_only"`
 }
 
 type IssueReaction struct {
@@ -1054,7 +1054,6 @@ type IssueVcsPullRequest struct {
 	IssueID       pgtype.UUID        `json:"issue_id"`
 	PullRequestID pgtype.UUID        `json:"pull_request_id"`
 	CloseIntent   bool               `json:"close_intent"`
-	ReferenceOnly bool               `json:"reference_only"`
 	LinkedByType  pgtype.Text        `json:"linked_by_type"`
 	LinkedByID    pgtype.UUID        `json:"linked_by_id"`
 	LinkedAt      pgtype.Timestamptz `json:"linked_at"`
